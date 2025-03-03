@@ -1,0 +1,15 @@
+[Unit]
+Description=Skyline Sonata Delivery Drone Service
+After=network.target
+
+[Service]
+Type=simple
+User=drone
+WorkingDirectory=/path/to/build/directory/delivery/drone
+ExecStart=/path/to/build/directory/delivery/drone/skyline_sonata.delivery.drone
+Environment=/etc/skyline-sonata/delivery/complete.env
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

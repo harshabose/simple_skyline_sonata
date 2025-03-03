@@ -1,0 +1,18 @@
+[submodule "dependencies/client"]
+	path = dependencies/client
+	url = https://github.com/harshabose/client.git
+[submodule "dependencies/datachannel"]
+	path = dependencies/datachannel
+	url = https://github.com/harshabose/datachannel.git
+[submodule "dependencies/mediasink"]
+	path = dependencies/mediasink
+	url = https://github.com/harshabose/mediasink.git
+[submodule "dependencies/mediasource"]
+	path = dependencies/mediasource
+	url = https://github.com/harshabose/mediasource.git
+[submodule "dependencies/transcode"]
+	path = dependencies/transcode
+	url = https://github.com/harshabose/transcode.git
+[submodule "dependencies/tools/buffer"]
+	path = dependencies/tools/buffer
+	url = https://github.com/harshabose/buffer.git

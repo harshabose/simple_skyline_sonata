@@ -1,0 +1,15 @@
+[Unit]
+Description=Skyline Sonata Sample Client Service
+After=network.target
+
+[Service]
+Type=simple
+User=drone
+WorkingDirectory=/path/to/build/directory/sample/client
+ExecStart=/path/to/build/directory/sample/client/skyline_sonata.sample.client
+Environment=/etc/skyline-sonata/sample/complete.env
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

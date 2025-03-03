@@ -1,0 +1,15 @@
+[Unit]
+Description=Skyline Sonata Delivery GCS Service
+After=network.target
+
+[Service]
+Type=simple
+User=gcs
+WorkingDirectory=/path/to/build/directory/delivery/gcs
+ExecStart=/path/to/build/directory/delivery/drone/skyline_sonata.delivery.gcs
+Environment=/etc/skyline-sonata/delivery/gcs.env
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
