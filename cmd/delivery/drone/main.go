@@ -9,6 +9,7 @@ import (
 	"github.com/harshabose/simple_webrtc_comm/mediasource/pkg"
 	"github.com/harshabose/simple_webrtc_comm/transcode/pkg"
 	"os"
+	"time"
 )
 
 func main() {
@@ -16,6 +17,7 @@ func main() {
 
 	deliveryDrone, err := client.CreateClient(
 		ctx, nil, nil,
+		client.WithBandwidthControlInterceptor(2500, 50*time.Millisecond),
 		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline42),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 		client.WithFLEXFECInterceptor(),
