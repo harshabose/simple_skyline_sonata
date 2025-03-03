@@ -200,26 +200,22 @@ build-delivery-drone: check
 	rm -rf $(BUILD_DIR)/delivery/drone
 	mkdir -p $(BUILD_DIR)/delivery/drone
 	cd $(CMD_DIR)/delivery/drone && \
-	$(COMPILE_ENV) \
-    go build -o $(BUILD_DIR)/delivery/drone/skyline_sonata.delivery.drone $(LDFLAGS) . || (echo "Build failed"; exit 1) \
+	$($(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV)) go build -o $(BUILD_DIR)/delivery/drone/skyline_sonata.delivery.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "Drone binary built successfully at $(BUILD_DIR)/delivery/drone"
 
 build-delivery-gcs: check
 	rm -rf $(BUILD_DIR)/delivery/gcs
 	mkdir -p $(BUILD_DIR)/delivery/gcs
 	cd $(CMD_DIR)/delivery/gcs && \
-	$(COMPILE_ENV) \
-   	go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	$(FIREBASE_ENV) $(NETWORK_ENV) go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "Drone binary built successfully at $(BUILD_DIR)/delivery/$(BINARY_GROUND_STATION)"
 
 run-delivery-drone: build-delivery-drone
 	echo "Running delivery drone..."
-	$(RUNTIME_ENV) \
-    cd $(BUILD_DIR)/delivery/drone && \
-	./skyline_sonata.delivery.drone
+	cd $(BUILD_DIR)/delivery/drone && \
+	$(RUNTIME_ENV) ./skyline_sonata.delivery.drone
 
-run-delivery-gcs: build-delivery-gcs
+run-delivery-gcs:
 	echo "Running delivery gcs..."
-	$(RUNTIME_ENV) \
-    cd $(BUILD_DIR)/delivery/gcs && \
-	./skyline_sonata.delivery.gcs
+	cd $(BUILD_DIR)/delivery/gcs && \
+	$(FIREBASE_ENV) $(NETWORK_ENV) ./skyline_sonata.delivery.gcs
