@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+
+	"github.com/pion/interceptor"
+	"github.com/pion/webrtc/v4"
+
 	"github.com/harshabose/simple_webrtc_comm/client/pkg"
 	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
@@ -10,11 +14,14 @@ import (
 func main() {
 	ctx := context.Background()
 
+	mediaEngine := &webrtc.MediaEngine{}
+	registry := &interceptor.Registry{}
+
 	gcs, err := client.CreateClient(
-		ctx, nil, nil,
-		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline42),
+		ctx, mediaEngine, registry,
+		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-		client.WithFLEXFECInterceptor(),
+		// client.WithFLEXFECInterceptor(),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 	)
