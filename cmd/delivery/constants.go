@@ -11,6 +11,6 @@ const (
 )
 
 const (
-	DefaultSPSBase64 = "AAAAAWdCwCmRoB4AiflhAAADAAEAAAMAMo8YMqA="
-	DefaultPPSBase64 = "AAAAAWjOD8g="
+	DefaultSPSBase64 = "AAAAAWdCwCmmgHgCJ+WEAAADAAQAAAMAyjxgyoA="
+	DefaultPPSBase64 = "AAAAAWjOPIA="
 )
