@@ -19,9 +19,8 @@ func main() {
 
 	gcs, err := client.CreateClient(
 		ctx, mediaEngine, registry,
-		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41),
+		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-		// client.WithFLEXFECInterceptor(),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 	)
@@ -40,7 +39,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := pc.CreateDataChannel("MAVLINK", data.WithRandomBindPort, data.WithLoopBackPort(14550)); err != nil {
+	if _, err := pc.CreateDataChannel("MAVLINK", data.WithRandomBindPort, data.WithLoopBackPort(14550)); err != nil {
 		panic(err)
 	}
 

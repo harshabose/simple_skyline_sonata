@@ -76,7 +76,7 @@ NETWORK_ENV := STUN_SERVER_URL=stun:stun.skyline-sonata.in:3478 \
                TURN_SERVER_PASSWORD=rufryz-wofdI5-mawged
 
 HARDWARE_ENV := MAVP2P_EXE_PATH=$(MAVP2P_INSTALL_DIR)/mavp2p \
-                FC_SERIAL_ADDRESS=/dev/ttyTHS0
+                MAVLINK_SERIAL=/dev/ttyTHS0:115200
 
 RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV)
 

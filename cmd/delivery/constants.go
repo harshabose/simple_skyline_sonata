@@ -9,3 +9,8 @@ const (
 	DefaultPixelFormat           = astiav.PixelFormatYuv420P
 	DefaultVideoFPS       uint8  = 25
 )
+
+const (
+	DefaultSPSBase64 = "AAAAAWdCwCmRoB4AiflhAAADAAEAAAMAMo8YMqA="
+	DefaultPPSBase64 = "AAAAAWjOD8g="
+)

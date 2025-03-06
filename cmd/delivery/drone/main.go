@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 
 	"github.com/asticode/go-astiav"
 	"github.com/pion/interceptor"
@@ -22,10 +23,8 @@ func main() {
 
 	deliveryDrone, err := client.CreateClient(
 		ctx, mediaEngine, registry,
-		// client.WithBandwidthControlInterceptor(2500, 50*time.Millisecond),
-		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41),
+		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-		// client.WithFLEXFECInterceptor(),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 	)
@@ -44,9 +43,9 @@ func main() {
 		panic(err)
 	}
 
-	if err := pc.CreateDataChannel("MAVLINK",
+	if _, err := pc.CreateDataChannel("MAVLINK",
 		data.WithRandomBindPort,
-		// data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
+		data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
 	); err != nil {
 		panic(err)
 	}
