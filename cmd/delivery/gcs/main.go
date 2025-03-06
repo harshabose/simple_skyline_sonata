@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
@@ -22,6 +23,7 @@ func main() {
 		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
+		client.WithSimulcastExtensionHeaders(),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 	)
 	if err != nil {
@@ -38,6 +40,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("created peer connection")
 
 	if _, err := pc.CreateDataChannel("MAVLINK", data.WithRandomBindPort, data.WithLoopBackPort(14550)); err != nil {
 		panic(err)

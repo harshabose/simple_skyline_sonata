@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"os"
+	"time"
 
 	"github.com/asticode/go-astiav"
 	"github.com/pion/interceptor"
@@ -21,11 +21,13 @@ func main() {
 	mediaEngine := &webrtc.MediaEngine{}
 	registry := &interceptor.Registry{}
 
-	deliveryDrone, err := client.CreateClient(
+	drone, err := client.CreateClient(
 		ctx, mediaEngine, registry,
+		client.WithBandwidthControlInterceptor(5_000_000, time.Second),
 		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
+		client.WithSimulcastExtensionHeaders(),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 		// client.WithFLEXFECInterceptor(),
 	)
@@ -33,12 +35,13 @@ func main() {
 		panic(err)
 	}
 
-	pc, err := deliveryDrone.CreatePeerConnection(
+	pc, err := drone.CreatePeerConnection(
 		"MAIN",
 		client.WithRTCConfiguration(client.GetRTCConfiguration()),
 		client.WithOfferSignal,
 		client.WithMediaSources(),
 		client.WithDataChannels(),
+		client.WithBandwidthControl(),
 	)
 	if err != nil {
 		panic(err)
@@ -46,7 +49,7 @@ func main() {
 
 	if _, err := pc.CreateDataChannel("MAVLINK",
 		data.WithRandomBindPort,
-		data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
+		// data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
 	); err != nil {
 		panic(err)
 	}
@@ -57,9 +60,9 @@ func main() {
 		mediasource.WithStream(
 			mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
 			mediasource.WithDemuxer(
-				// "/dev/video0",
-				"rtsp://192.168.144.25:8554/main.264",
-				transcode.WithRTSPInputOption,
+				"/dev/video0",
+				// "rtsp://192.168.144.25:8554/main.264",
+				// transcode.WithRTSPInputOption,
 				transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)*3),
 			),
 			mediasource.WithDecoder(transcode.WithDecoderBufferSize(int(delivery.DefaultVideoFPS)*3)),
@@ -84,5 +87,5 @@ func main() {
 		panic(err)
 	}
 
-	deliveryDrone.WaitUntilClosed()
+	drone.WaitUntilClosed()
 }
