@@ -40,7 +40,6 @@ func main() {
 		client.WithOfferSignal,
 		client.WithMediaSources(),
 		client.WithDataChannels(),
-		client.WithBandwidthControl(),
 	)
 	if err != nil {
 		panic(err)
@@ -53,7 +52,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := pc.CreateMediaSource("A8-MINI", true,
+	if err := pc.CreateMediaSource("A8-MINI", false,
 		mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline41),
 		mediasource.WithPriority(mediasource.Level5),
 		mediasource.WithStream(
