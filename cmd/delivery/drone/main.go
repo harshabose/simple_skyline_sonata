@@ -27,6 +27,7 @@ func main() {
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+		// client.WithFLEXFECInterceptor(),
 	)
 	if err != nil {
 		panic(err)
@@ -56,9 +57,9 @@ func main() {
 		mediasource.WithStream(
 			mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
 			mediasource.WithDemuxer(
-				"/dev/video0",
-				// "rtsp://192.168.144.25:8554/main.264",
-				// transcode.WithRTSPInputOption,
+				// "/dev/video0",
+				"rtsp://192.168.144.25:8554/main.264",
+				transcode.WithRTSPInputOption,
 				transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)*3),
 			),
 			mediasource.WithDecoder(transcode.WithDecoderBufferSize(int(delivery.DefaultVideoFPS)*3)),
