@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/asticode/go-astiav"
 	"github.com/pion/interceptor"
@@ -23,13 +22,13 @@ func main() {
 
 	drone, err := client.CreateClient(
 		ctx, mediaEngine, registry,
-		client.WithBandwidthControlInterceptor(5_000_000, time.Second),
+		// client.WithBandwidthControlInterceptor(5_000_000, time.Second),
 		client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 		client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 		client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 		client.WithSimulcastExtensionHeaders(),
 		client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
-		// client.WithFLEXFECInterceptor(),
+		client.WithDefaultInterceptorRegistry(),
 	)
 	if err != nil {
 		panic(err)
