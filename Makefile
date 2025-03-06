@@ -51,10 +51,10 @@ MAVP2P_INSTALL_DIR := $(THIRD_PARTY_DIR)/mavp2p
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-COMPILE_ENV := CGO_LDFLAGS="-L$(FFMPEG_DIRECTORY)/lib" \
-               CGO_CFLAGS="-I$(FFMPEG_DIRECTORY)/include" \
-               PKG_CONFIG_PATH="$(FFMPEG_DIRECTORY)/lib/pkgconfig" \
-               LD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$LD_LIBRARY_PATH"
+COMPILE_ENV := CGO_LDFLAGS="-L$(FFMPEG_DIRECTORY)/lib -L$(X264_DIRECTORY)/lib" \
+               CGO_CFLAGS="-I$(FFMPEG_DIRECTORY)/include -I$(X264_DIRECTORY)/include" \
+               PKG_CONFIG_PATH="$(FFMPEG_DIRECTORY)/lib/pkgconfig:$(X264_DIRECTORY)/lib/pkgconfig" \
+               LD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib$LD_LIBRARY_PATH"
 
 FIREBASE_ENV := FIREBASE_TYPE=service_account \
                 FIREBASE_PROJECT_ID=iitb-rgstc-signalling-server \
