@@ -158,18 +158,18 @@ install-ffmpeg: install-windows-deps
 	echo "Cloning FFmpeg (this may take several minutes)..."
 	cd $(FFMPEG_SRC_DIR) && git clone --progress https://github.com/FFmpeg/FFmpeg .
 	cd $(FFMPEG_SRC_DIR) && git checkout $(FFMPEG_VERSION)
-	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig:$(OPUS_DIRECTORY)/lib/pkgconfig" ./configure \
+	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig" ./configure \
 		--prefix=$(FFMPEG_DIRECTORY) \
 		--enable-gpl \
 		--enable-ffplay \
         --enable-libx264 \
-        --enable-libopus \
-        --enable-alsa \
+#        --enable-libopus \
+#        --enable-alsa \
         --enable-shared \
         --enable-version3 \
         --enable-pic \
-        --extra-cflags="-I$(X264_DIRECTORY)/include -I$(OPUS_DIRECTORY)/include" \
-		--extra-ldflags="-L$(X264_DIRECTORY)/lib -L$(OPUS_DIRECTORY)/lib"
+        --extra-cflags="-I$(X264_DIRECTORY)/include" \
+		--extra-ldflags="-L$(X264_DIRECTORY)/lib"
 	cd $(FFMPEG_SRC_DIR) && make -j$(nproc)
 	cd $(FFMPEG_SRC_DIR) && make install
 	if [ ! -d "$(FFMPEG_DIRECTORY)/lib" ]; then \
