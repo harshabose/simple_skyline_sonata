@@ -2,8 +2,6 @@
 
 A lightweight, embedded-friendly WebRTC implementation designed specifically for drone-to-any networking and webrtc-mesh networking.
 
-![IIT Bombay](https://upload.wikimedia.org/wikipedia/en/thumb/d/d0/IIT_Bombay_color_logo.png/220px-IIT_Bombay_color_logo.png)
-
 **For Internal Use Only: Indian Institute of Technology Bombay**
 
 ## Overview
