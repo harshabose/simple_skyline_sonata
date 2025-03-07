@@ -142,6 +142,8 @@ func main() {
 
 ```
 
+Documentation available with approval.
+
 ## Performance Considerations
 
 For optimal performance in drone applications:
