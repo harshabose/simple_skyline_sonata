@@ -220,3 +220,29 @@ run-delivery-gcs:
 	echo "Running delivery gcs..."
 	cd $(BUILD_DIR)/delivery/gcs && \
 	$(RUNTIME_ENV) ./skyline_sonata.delivery.gcs
+
+build-audio-drone: check
+	echo "Building audio drone binary..."
+	rm -rf $(BUILD_DIR)/audio/drone
+	mkdir -p $(BUILD_DIR)/audio/drone
+	cd $(CMD_DIR)/audio/drone && \
+	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/drone/skyline_sonata.audio.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "audio drone binary built successfully at $(BUILD_DIR)/audio/drone"
+
+build-audio-gcs: check
+	echo "Building audio gcs binary..."
+	rm -rf $(BUILD_DIR)/audio/gcs
+	mkdir -p $(BUILD_DIR)/audio/gcs
+	cd $(CMD_DIR)/audio/gcs && \
+	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/gcs/skyline_sonata.audio.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "audio gcs binary built successfully at $(BUILD_DIR)/audio/$(BINARY_GROUND_STATION)"
+
+run-audio-drone:
+	echo "Running audio drone..."
+	cd $(BUILD_DIR)/audio/drone && \
+	$(RUNTIME_ENV) ./skyline_sonata.audio.drone
+
+run-audio-gcs:
+	echo "Running audio gcs..."
+	cd $(BUILD_DIR)/audio/gcs && \
+	$(RUNTIME_ENV) ./skyline_sonata.audio.gcs
