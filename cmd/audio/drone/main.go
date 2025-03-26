@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -51,8 +52,19 @@ func main() {
 
 			if _, err := pc.CreateDataChannel("MAVLINK",
 				data.WithRandomBindPort,
-				// data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
+				data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
 			); err != nil {
+				panic(err)
+			}
+
+			notchUpdater, err := transcode.CreatePropNoiseFilterUpdator(ctx, "ttyTHS0", 57600, 200*time.Millisecond)
+			notchUpdater.AddNotchFilter(transcode.PropellerOne, 500, 5, 2)
+			notchUpdater.AddNotchFilter(transcode.PropellerTwo, 500, 5, 2)
+			notchUpdater.AddNotchFilter(transcode.PropellerThree, 500, 5, 2)
+			notchUpdater.AddNotchFilter(transcode.PropellerFour, 500, 5, 2)
+			notchUpdater.AddNotchFilter(transcode.PropellerFive, 500, 5, 2)
+			notchUpdater.AddNotchFilter(transcode.PropellerSix, 500, 5, 2)
+			if err != nil {
 				panic(err)
 			}
 
@@ -73,6 +85,13 @@ func main() {
 						transcode.WithAudioSampleFormatChannelLayoutFilter(audio.DefaultAudioSampleFormat, astiav.ChannelLayoutStereo),
 						transcode.WithAudioSampleRateFilter(audio.DefaultAudioSampleRate),
 						transcode.WithAudioSamplesPerFrameContent(audio.DefaultAudioSamplesPerFrame),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerOne.String(), 500, 5, 20.0),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerTwo.String(), 500, 5, 20.0),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerThree.String(), 500, 5, 20.0),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerFour.String(), 500, 5, 20.0),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerFive.String(), 500, 5, 20.0),
+						transcode.WithAudioNotchHarmonicsFilterContent(transcode.PropellerSix.String(), 500, 5, 20.0),
+						transcode.WithUpdateFilter(notchUpdater),
 					),
 					mediasource.WithEncoder(
 						astiav.CodecIDOpus,
