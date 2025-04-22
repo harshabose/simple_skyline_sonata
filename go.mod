@@ -20,6 +20,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	cloud.google.com/go/storage v1.43.0 // indirect
 	firebase.google.com/go v3.13.0+incompatible // indirect
+	github.com/aler9/gomavlib v1.3.0 // indirect
 	github.com/asticode/go-astikit v0.52.0 // indirect
 	github.com/bluenviron/gortsplib/v4 v4.12.3 // indirect
 	github.com/bluenviron/mediacommon v1.14.0 // indirect
@@ -49,6 +50,7 @@ require (
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
 	github.com/pion/webrtc/v4 v4.0.10 // indirect
+	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
