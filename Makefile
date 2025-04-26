@@ -116,7 +116,7 @@ check:
 	git --version >$(NULL_DEV) 2>&1 || (echo "git is not installed or not in PATH"; exit 1)
 	go version >$(NULL_DEV) 2>&1 || (echo "go is not installed or not in PATH"; exit 1)
 
-install-third-party: install-ffmpeg install-mavp2p
+install-third-party: install-ffmpeg-linux install-mavp2p
 
 install-libx264:
 	mkdir -p $(X264_SRC_DIR)
@@ -149,7 +149,7 @@ install-windows-deps:
 		pacman -S --noconfirm --needed git diffutils mingw-w64-x86_64-toolchain pkg-config make yasm; \
 	fi
 
-install-ffmpeg: install-windows-deps
+install-ffmpeg-linux:
 	echo "Installing FFmpeg $(FFMPEG_VERSION) from source..."
 	mkdir -p $(FFMPEG_DIRECTORY)
 	mkdir -p $(FFMPEG_SRC_DIR)
@@ -158,28 +158,46 @@ install-ffmpeg: install-windows-deps
 	echo "Cloning FFmpeg (this may take several minutes)..."
 	cd $(FFMPEG_SRC_DIR) && git clone --progress https://github.com/FFmpeg/FFmpeg .
 	cd $(FFMPEG_SRC_DIR) && git checkout $(FFMPEG_VERSION)
-	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig" ./configure \
+	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig:$(OPUS_DIRECTORY)/lib/pkgconfig" ./configure \
 		--prefix=$(FFMPEG_DIRECTORY) \
 		--enable-gpl \
 		--enable-ffplay \
         --enable-libx264 \
-#        --enable-libopus \
-#        --enable-alsa \
+        --enable-libopus \
+        --enable-alsa \
         --enable-shared \
         --enable-version3 \
         --enable-pic \
-        --extra-cflags="-I$(X264_DIRECTORY)/include" \
-		--extra-ldflags="-L$(X264_DIRECTORY)/lib"
+        --extra-cflags="-I$(X264_DIRECTORY)/include -I$(OPUS_DIRECTORY)/include" \
+		--extra-ldflags="-L$(X264_DIRECTORY)/lib -L$(OPUS_DIRECTORY)/lib"
 	cd $(FFMPEG_SRC_DIR) && make -j$(nproc)
 	cd $(FFMPEG_SRC_DIR) && make install
 	if [ ! -d "$(FFMPEG_DIRECTORY)/lib" ]; then \
 		echo "FFmpeg installation failed: lib directory not found"; \
 		exit 1; \
 	fi
-	echo "FFmpeg installation complete. Please set the following environment variables:"
-	echo "export CGO_LDFLAGS=\"-L$(FFMPEG_DIRECTORY)/lib/\""
-	echo "export CGO_CFLAGS=\"-I$(FFMPEG_DIRECTORY)/include/\""
-	echo "export PKG_CONFIG_PATH=\"$(FFMPEG_DIRECTORY)/lib/pkgconfig/\""
+
+install-ffmpeg-docker:
+	echo "Installing FFmpeg $(FFMPEG_VERSION) from source..."
+	mkdir -p $(FFMPEG_DIRECTORY)
+	mkdir -p $(FFMPEG_SRC_DIR)
+	cd $(FFMPEG_DIRECTORY) && rm -rf $(FFMPEG_SRC_DIR)
+	mkdir -p $(FFMPEG_SRC_DIR)
+	echo "Cloning FFmpeg (this may take several minutes)..."
+	cd $(FFMPEG_SRC_DIR) && git clone --progress https://github.com/FFmpeg/FFmpeg .
+	cd $(FFMPEG_SRC_DIR) && git checkout $(FFMPEG_VERSION)
+	cd $(FFMPEG_SRC_DIR) && ./configure \
+		--prefix=$(FFMPEG_DIRECTORY) \
+		--enable-gpl \
+        --enable-shared \
+        --enable-version3 \
+        --enable-pic
+	cd $(FFMPEG_SRC_DIR) && make -j$(nproc)
+	cd $(FFMPEG_SRC_DIR) && make install
+	if [ ! -d "$(FFMPEG_DIRECTORY)/lib" ]; then \
+		echo "FFmpeg installation failed: lib directory not found"; \
+		exit 1; \
+	fi
 
 install-mavp2p:
 	echo "Installing mavp2p from source..."

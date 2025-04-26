@@ -1,5 +1,7 @@
-FROM golang:1.21-bullseye
+FROM golang:1.23-bullseye
 LABEL authors="harshabose"
+
+SHELL ["/bin/bash", "-c"]
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,20 +18,18 @@ RUN apt-get update && apt-get install -y \
     nasm
 
 # Create app directory
-WORKDIR /app
+WORKDIR /simple_skyline_sonata-gcs
 
-# Clone the repository (you'll need to provide GITHUB_TOKEN at build time)
-ARG GITHUB_TOKEN
-RUN git clone --recursive https://${GITHUB_TOKEN}@github.com/harshabose/simple_skyline_sonata.git .
+COPY . .
 
 # Run the make commands to install dependencies
-RUN make install-libx264
-RUN make install-libopus
-RUN make install-ffmpeg
+RUN make install-ffmpeg-docker
 RUN make install-mavp2p
 
-# Build your application
-RUN make build-delivery-gcs
+# Will create complete.env file
+RUN make create-env-file
 
-# Run your application
-CMD make run-delivery-gcs
+RUN bash -c 'make build-delivery-gcs'
+
+# Run main application
+CMD bash -c 'make run-delivery-gcs'
