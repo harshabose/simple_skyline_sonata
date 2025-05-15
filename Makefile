@@ -80,6 +80,8 @@ HARDWARE_ENV := MAVP2P_EXE_PATH=$(MAVP2P_INSTALL_DIR)/mavp2p \
 
 RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV)
 
+WINDOWS_RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV)
+
 
 create-env-file:
 	@echo "Creating environment files..."
@@ -254,6 +256,14 @@ build-audio-gcs: check
 	cd $(CMD_DIR)/audio/gcs && \
 	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/gcs/skyline_sonata.audio.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "audio gcs binary built successfully at $(BUILD_DIR)/audio/$(BINARY_GROUND_STATION)"
+
+build-audio-gcs-windows-amd64: check
+	echo "Building audio gcs binary..."
+	rm -rf $(BUILD_DIR)/delivery/gcs
+	mkdir -p $(BUILD_DIR)/delivery/gcs
+	cd $(CMD_DIR)/delivery/gcs && \
+	$(RUNTIME_ENV) GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.windows.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "audio gcs binary built successfully at $(BUILD_DIR)/delivery/$(BINARY_GROUND_STATION)"
 
 run-audio-drone:
 	echo "Running audio drone..."
