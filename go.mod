@@ -3,11 +3,8 @@ module github.com/harshabose/simple_webrtc_comm
 go 1.23.3
 
 require (
-	github.com/asticode/go-astiav v0.33.1
 	github.com/harshabose/simple_webrtc_comm/client v0.0.0
 	github.com/harshabose/simple_webrtc_comm/datachannel v0.0.0
-	github.com/harshabose/simple_webrtc_comm/mediasource v0.0.0
-	github.com/harshabose/simple_webrtc_comm/transcode v0.0.0
 )
 
 require (
@@ -20,8 +17,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	cloud.google.com/go/storage v1.43.0 // indirect
 	firebase.google.com/go v3.13.0+incompatible // indirect
-	github.com/aler9/gomavlib v1.3.0 // indirect
-	github.com/asticode/go-astikit v0.52.0 // indirect
+	//github.com/asticode/go-astikit v0.52.0 // indirect
 	github.com/bluenviron/gortsplib/v4 v4.12.3 // indirect
 	github.com/bluenviron/mediacommon v1.14.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -37,7 +33,7 @@ require (
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v3 v3.0.4 // indirect
 	github.com/pion/ice/v4 v4.0.6 // indirect
-	github.com/pion/interceptor v0.1.37 // indirect
+	github.com/pion/interceptor v0.1.37
 	github.com/pion/logging v0.2.3 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
@@ -49,8 +45,7 @@ require (
 	github.com/pion/stun/v3 v3.0.0 // indirect
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
-	github.com/pion/webrtc/v4 v4.0.10 // indirect
-	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 // indirect
+	github.com/pion/webrtc/v4 v4.0.10
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
@@ -78,7 +73,5 @@ replace (
 	github.com/harshabose/simple_webrtc_comm/client => ./dependencies/client
 	github.com/harshabose/simple_webrtc_comm/datachannel => ./dependencies/datachannel
 	github.com/harshabose/simple_webrtc_comm/mediasink => ./dependencies/mediasink
-	github.com/harshabose/simple_webrtc_comm/mediasource => ./dependencies/mediasource
-	github.com/harshabose/simple_webrtc_comm/transcode => ./dependencies/transcode
 	github.com/harshabose/tools/buffer => ./dependencies/tools/buffer
 )

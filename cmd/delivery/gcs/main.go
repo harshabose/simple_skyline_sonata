@@ -8,9 +8,10 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 
-	"github.com/harshabose/simple_webrtc_comm/client/pkg"
+	client "github.com/harshabose/simple_webrtc_comm/client/pkg"
+	data "github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
+
 	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
-	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
 )
 
 func main() {
@@ -37,10 +38,10 @@ func main() {
 
 			pc, err := gcs.CreatePeerConnection(
 				"MAIN",
-				client.WithRTCConfiguration(client.GetRTCConfiguration()),
-				client.WithAnswerSignal,
-				client.WithMediaSinks(),
-				client.WithDataChannels(),
+				client.WithRTCConfigurationReceiver(client.GetRTCConfiguration()),
+				client.WithAnswerSignalReceiver,
+				client.WithMediaSinksReceiver(),
+				client.WithDataChannelsReceiver(),
 			)
 			if err != nil {
 				panic(err)

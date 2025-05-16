@@ -257,12 +257,12 @@ build-audio-gcs: check
 	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/gcs/skyline_sonata.audio.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "audio gcs binary built successfully at $(BUILD_DIR)/audio/$(BINARY_GROUND_STATION)"
 
-build-audio-gcs-windows-amd64: check
-	echo "Building audio gcs binary..."
+build-delivery-gcs-windows-amd64: check
+	echo "Building windows gcs binary..."
 	rm -rf $(BUILD_DIR)/delivery/gcs
 	mkdir -p $(BUILD_DIR)/delivery/gcs
 	cd $(CMD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.windows.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	$(WINDOWS_RUNTIME_ENV) GOOS=windows GOARCH=amd64 go build -v -x -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.windows.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "audio gcs binary built successfully at $(BUILD_DIR)/delivery/$(BINARY_GROUND_STATION)"
 
 run-audio-drone:
