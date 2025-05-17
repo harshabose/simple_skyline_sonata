@@ -213,7 +213,15 @@ install-mavp2p:
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+run-sim-test-drone: check
+	echo "Running sim test drone..."
+	cd $(CMD_DIR)/delivery/sim-drone && \
+	$(RUNTIME_ENV) go run main.go
 
+run-sim-test-gcs: check
+	echo "Running sim test gcs"
+	cd $(CMD_DIR)/delivery/gcs && \
+	$(RUNTIME_ENV) go run main.go
 
 build-delivery-drone: check
 	echo "Building delivery drone binary..."
