@@ -27,11 +27,11 @@ func main() {
 			gcs, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				// client.WithTWCCHeaderExtensionSender(),
-				// client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-				// client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
-				// client.WithSimulcastExtensionHeaders(),
-				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				client.WithTWCCHeaderExtensionSender(),
+				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
+				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
+				client.WithSimulcastExtensionHeaders(),
+				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 				client.WithDefaultInterceptorRegistry(),
 			)
 			if err != nil {
