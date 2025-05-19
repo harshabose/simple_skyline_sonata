@@ -21,6 +21,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/cc"
 	"github.com/pion/interceptor/pkg/gcc"
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
@@ -50,13 +51,18 @@ func main() { //nolint:gocognit,cyclop,maintidx
 	}
 	currentQuality := 0
 
+	// Check if IVF files exist
+	fmt.Println("🎬 Checking for video files...")
 	for _, level := range qualityLevels {
 		_, err := os.Stat(level.fileName)
 		if os.IsNotExist(err) {
-			panic(fmt.Sprintf("File %s was not found", level.fileName))
+			panic(fmt.Sprintf("❌ File %s was not found", level.fileName))
 		}
+		fmt.Printf("✓ Found %s\n", level.fileName)
 	}
 
+	// Setup WebRTC
+	fmt.Println("\n🔧 Setting up WebRTC...")
 	interceptorRegistry := &interceptor.Registry{}
 	mediaEngine := &webrtc.MediaEngine{}
 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
@@ -120,61 +126,68 @@ func main() { //nolint:gocognit,cyclop,maintidx
 	}
 
 	// Read incoming RTCP packets
-	// Before these packets are returned they are processed by interceptors. For things
-	// like NACK this needs to be called.
 	go func() {
-		rtcpBuf := make([]byte, 1500)
-		for {
-			if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
-				return
-			}
-		}
+		readRTCPWithAnalysis(rtpSender)
+		// rtcpBuf := make([]byte, 1500)
+		// for {
+		// 	if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+		// 		return
+		// 	}
+		// }
 	}()
 
 	// Set the handler for ICE connection state
-	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+		fmt.Printf("🔗 ICE Connection State: %s\n", connectionState.String())
 	})
 
 	// Set the handler for Peer connection state
-	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
+		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
 	})
 
-	// Wait for the offer to be pasted
-	offer := webrtc.SessionDescription{}
-	decode(readUntilNewline(), &offer)
+	// ================================
+	// FILE-BASED SDP EXCHANGE
+	// ================================
 
-	// Set the remote SessionDescription
-	if err = peerConnection.SetRemoteDescription(offer); err != nil {
-		panic(err)
+	fmt.Println("\n=======================================================")
+	fmt.Println("🎥 WebRTC Bandwidth Estimation Demo (File-based SDP)")
+	fmt.Println("=======================================================")
+	fmt.Println("Choose your role:")
+	fmt.Println("1. Create an offer (generate offer.txt)")
+	fmt.Println("2. Wait for an offer (read offer.txt and generate answer.txt)")
+	fmt.Print("Enter choice (1 or 2): ")
+
+	choice := readInput()
+
+	var isOfferer bool
+	switch strings.TrimSpace(choice) {
+	case "1":
+		isOfferer = true
+		fmt.Println("✓ You chose to create an offer")
+	case "2":
+		isOfferer = false
+		fmt.Println("✓ You chose to wait for an offer")
+	default:
+		panic("Invalid choice. Please enter 1 or 2.")
 	}
 
-	// Create answer
-	answer, err := peerConnection.CreateAnswer(nil)
-	if err != nil {
-		panic(err)
+	// File-based SDP exchange
+	if isOfferer {
+		handleOffererFlow(peerConnection)
+	} else {
+		handleAnswererFlow(peerConnection)
 	}
 
-	// Create channel that is blocked until ICE Gathering is complete
-	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+	fmt.Println("\n🎬 Starting video streaming with bandwidth adaptation...")
+	fmt.Println("📊 Monitor bandwidth changes and quality switching...")
+	fmt.Println("Press Ctrl+C to stop")
 
-	// Sets the LocalDescription, and starts our UDP listeners
-	if err = peerConnection.SetLocalDescription(answer); err != nil {
-		panic(err)
-	}
+	// ================================
+	// VIDEO STREAMING WITH BWE
+	// ================================
 
-	// Block until ICE Gathering is complete, disabling trickle ICE
-	// we do this because we only can exchange one signaling message
-	// in a production application you should exchange ICE Candidates via OnICECandidate
-	<-gatherComplete
-
-	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(encode(peerConnection.LocalDescription()))
-
-	// Open a IVF file and start reading using our IVFReader
+	// Open initial IVF file
 	file, err := os.Open(qualityLevels[currentQuality].fileName)
 	if err != nil {
 		panic(err)
@@ -185,29 +198,27 @@ func main() { //nolint:gocognit,cyclop,maintidx
 		panic(err)
 	}
 
-	// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
-	// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
-	//
-	// It is important to use a time.Ticker instead of time.Sleep because
-	// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
-	// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
+	// Calculate frame timing based on IVF header
 	ticker := time.NewTicker(
 		time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000),
 	)
 	defer ticker.Stop()
+
 	frame := []byte{}
 	frameHeader := &ivfreader.IVFFrameHeader{}
 	currentTimestamp := uint64(0)
+	frameCount := 0
 
 	switchQualityLevel := func(newQualityLevel int) {
-		fmt.Printf(
-			"Switching from %s to %s \n",
-			qualityLevels[currentQuality].fileName,
-			qualityLevels[newQualityLevel].fileName,
+		fmt.Printf("🔄 Switching quality: %s (%.1f Mbps) → %s (%.1f Mbps)\n",
+			qualityLevels[currentQuality].fileName, float64(qualityLevels[currentQuality].bitrate)/1_000_000,
+			qualityLevels[newQualityLevel].fileName, float64(qualityLevels[newQualityLevel].bitrate)/1_000_000,
 		)
 
 		currentQuality = newQualityLevel
 		ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
+
+		// Find a suitable frame to start from (keyframe preferred)
 		for {
 			if frame, frameHeader, err = ivf.ParseNextFrame(); err != nil {
 				break
@@ -217,38 +228,181 @@ func main() { //nolint:gocognit,cyclop,maintidx
 		}
 	}
 
+	// Start streaming loop
+	// lastBitrateReport := time.Now()
 	for ; true; <-ticker.C {
 		targetBitrate := estimator.GetTargetBitrate()
+
+		// Report bitrate every 5 seconds
+		// if time.Since(lastBitrateReport) > 5*time.Second {
+		fmt.Printf("📊 Target bitrate: %f Mbps | Current quality: %s | Frames sent: %d\n",
+			float64(targetBitrate)/1000000,
+			qualityLevels[currentQuality].fileName,
+			frameCount,
+		)
+		// lastBitrateReport = time.Now()
+		// }
+
+		// Bandwidth-based quality switching
 		switch {
-		// If current quality level is below target bitrate drop to level below
+		// Downgrade quality if target bitrate is below current level
 		case currentQuality != 0 && targetBitrate < qualityLevels[currentQuality].bitrate:
 			switchQualityLevel(currentQuality - 1)
 
-			// If next quality level is above target bitrate move to next level
+		// Upgrade quality if target bitrate is above next level
 		case len(qualityLevels) > (currentQuality+1) && targetBitrate > qualityLevels[currentQuality+1].bitrate:
 			switchQualityLevel(currentQuality + 1)
 
-		// Adjust outbound bandwidth for probing
+		// Normal frame processing
 		default:
 			frame, frameHeader, err = ivf.ParseNextFrame()
 		}
 
 		switch {
-		// If we have reached the end of the file start again
+		// Loop the video when we reach the end
 		case errors.Is(err, io.EOF):
 			ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
 
-		// No error write the video frame
+		// Send the frame
 		case err == nil:
 			currentTimestamp = frameHeader.Timestamp
 			if err = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
-				panic(err)
+				// Don't panic on frame errors, just log them
+				fmt.Printf("⚠ Error sending frame: %v\n", err)
+			} else {
+				frameCount++
 			}
-		// Error besides io.EOF that we dont know how to handle
+
+		// Handle other errors
 		default:
-			panic(err)
+			fmt.Printf("⚠ Frame parsing error: %v\n", err)
 		}
 	}
+}
+
+// Handle the offerer (initiator) flow
+func handleOffererFlow(pc *webrtc.PeerConnection) {
+	fmt.Println("\n⚡ Creating offer...")
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = pc.SetLocalDescription(offer); err != nil {
+		panic(err)
+	}
+
+	// Wait for ICE gathering to complete
+	gatherComplete := webrtc.GatheringCompletePromise(pc)
+	fmt.Println("⏳ Gathering ICE candidates...")
+	<-gatherComplete
+	fmt.Println("✓ ICE gathering complete")
+
+	// Save offer to file
+	saveSDPToFile(pc.LocalDescription(), "offer.txt")
+	fmt.Println("\n📤 Offer saved to offer.txt")
+	fmt.Println("📋 Instructions:")
+	fmt.Println("   1. Send offer.txt to the remote peer")
+	fmt.Println("   2. Wait for them to send you answer.txt")
+	fmt.Println("   3. Place answer.txt in this directory")
+	fmt.Println("   4. Press Enter to continue...")
+
+	// Wait for user to place answer.txt
+	waitForFile("answer.txt")
+
+	// Load answer from file
+	answer := loadSDPFromFile("answer.txt")
+	if err = pc.SetRemoteDescription(answer); err != nil {
+		panic(fmt.Sprintf("❌ Error setting remote description: %v", err))
+	}
+	fmt.Println("✓ Answer processed successfully")
+}
+
+// Handle the answerer (responder) flow
+func handleAnswererFlow(pc *webrtc.PeerConnection) {
+	fmt.Println("\n📥 Waiting for offer...")
+	fmt.Println("📋 Instructions:")
+	fmt.Println("   1. Obtain offer.txt from the remote peer")
+	fmt.Println("   2. Place offer.txt in this directory")
+	fmt.Println("   3. Press Enter to continue...")
+
+	// Wait for user to place offer.txt
+	waitForFile("offer.txt")
+
+	// Load offer from file
+	offer := loadSDPFromFile("offer.txt")
+	if err := pc.SetRemoteDescription(offer); err != nil {
+		panic(fmt.Sprintf("❌ Error setting remote description: %v", err))
+	}
+
+	// Create answer
+	fmt.Println("⚡ Creating answer...")
+	answer, err := pc.CreateAnswer(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// Wait for ICE gathering
+	gatherComplete := webrtc.GatheringCompletePromise(pc)
+	if err = pc.SetLocalDescription(answer); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("⏳ Gathering ICE candidates...")
+	<-gatherComplete
+	fmt.Println("✓ ICE gathering complete")
+
+	// Save answer to file
+	saveSDPToFile(pc.LocalDescription(), "answer.txt")
+	fmt.Println("\n📤 Answer saved to answer.txt")
+	fmt.Println("📋 Instructions:")
+	fmt.Println("   1. Send answer.txt back to the remote peer")
+	fmt.Println("   2. Connection should establish automatically")
+}
+
+// Save SDP to file
+func saveSDPToFile(sdp *webrtc.SessionDescription, filename string) {
+	encoded := encode(sdp)
+	err := os.WriteFile(filename, []byte(encoded), 0644)
+	if err != nil {
+		panic(fmt.Sprintf("❌ Error saving SDP to %s: %v", filename, err))
+	}
+	fmt.Printf("✓ SDP saved to %s (%d bytes)\n", filename, len(encoded))
+}
+
+// Load SDP from file
+func loadSDPFromFile(filename string) webrtc.SessionDescription {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		panic(fmt.Sprintf("❌ Error reading %s: %v", filename, err))
+	}
+
+	var sdp webrtc.SessionDescription
+	encoded := strings.TrimSpace(string(data))
+	decode(encoded, &sdp)
+	fmt.Printf("✓ SDP loaded from %s (%d bytes)\n", filename, len(data))
+	return sdp
+}
+
+// Wait for file to exist and user confirmation
+func waitForFile(filename string) {
+	for {
+		readInput() // Wait for user to press Enter
+
+		if _, err := os.Stat(filename); err == nil {
+			fmt.Printf("✓ Found %s\n", filename)
+			break
+		} else {
+			fmt.Printf("❌ %s not found. Please place the file and press Enter again...\n", filename)
+		}
+	}
+}
+
+// Simple input reader
+func readInput() string {
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	return strings.TrimSpace(input)
 }
 
 func setReaderFile(filename string) func(_ int64) io.Reader {
@@ -260,50 +414,179 @@ func setReaderFile(filename string) func(_ int64) io.Reader {
 		if _, err = file.Seek(ivfHeaderSize, io.SeekStart); err != nil {
 			panic(err)
 		}
-
 		return file
 	}
 }
 
-// Read from stdin until we get a newline.
-func readUntilNewline() (in string) {
-	var err error
-
-	r := bufio.NewReader(os.Stdin)
-	for {
-		in, err = r.ReadString('\n')
-		if err != nil && !errors.Is(err, io.EOF) {
-			panic(err)
-		}
-
-		if in = strings.TrimSpace(in); len(in) > 0 {
-			break
-		}
-	}
-
-	fmt.Println("")
-
-	return
-}
-
-// JSON encode + base64 a SessionDescription.
+// JSON encode + base64 a SessionDescription
 func encode(obj *webrtc.SessionDescription) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
 		panic(err)
 	}
-
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription.
+// Decode a base64 and unmarshal JSON into a SessionDescription
 func decode(in string, obj *webrtc.SessionDescription) {
+	fmt.Printf("🔍 Decoding SDP (%d chars)\n", len(in))
+
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("❌ Base64 decode error: %v", err))
 	}
 
 	if err = json.Unmarshal(b, obj); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("❌ JSON unmarshal error: %v", err))
 	}
+
+	fmt.Printf("✓ SDP parsed successfully (type: %s)\n", obj.Type)
+}
+
+// Enhanced RTCP reader that parses and analyzes TWCC feedback
+func readRTCPWithAnalysis(rtpSender *webrtc.RTPSender) {
+	rtcpBuf := make([]byte, 1500)
+	lastTWCCReport := time.Now()
+
+	for {
+		n, _, rtcpErr := rtpSender.Read(rtcpBuf)
+		if rtcpErr != nil {
+			fmt.Printf("RTCP read error: %v\n", rtcpErr)
+			return
+		}
+
+		// Parse the RTCP packet
+		packets, err := rtcp.Unmarshal(rtcpBuf[:n])
+		if err != nil {
+			fmt.Printf("Failed to unmarshal RTCP: %v\n", err)
+			continue
+		}
+
+		// Analyze each RTCP packet
+		for _, packet := range packets {
+			switch p := packet.(type) {
+			case *rtcp.TransportLayerCC:
+				// TWCC feedback packet - this is what we're interested in!
+				analyzeTWCCFeedback(p)
+				lastTWCCReport = time.Now()
+
+			case *rtcp.ReceiverReport:
+				analyzeReceiverReport(p)
+
+			case *rtcp.SenderReport:
+				analyzeSenderReport(p)
+
+			case *rtcp.ReceiverEstimatedMaximumBitrate:
+				// REMB packet
+				analyzeREMBFeedback(p)
+
+			default:
+				fmt.Printf("📄 Other RTCP packet: %T\n", packet)
+			}
+		}
+
+		// Check if we're missing TWCC feedback
+		if time.Since(lastTWCCReport) > 5*time.Second {
+			fmt.Printf("⚠️  No TWCC feedback received for %v - BWE may be stuck!\n",
+				time.Since(lastTWCCReport))
+		}
+	}
+}
+
+func analyzeTWCCFeedback(twcc *rtcp.TransportLayerCC) {
+	fmt.Printf("📈 TWCC Feedback Received:\n")
+	fmt.Printf("  Media SSRC: %d\n", twcc.MediaSSRC)
+	fmt.Printf("  Feedback Packet Count: %d\n", twcc.FbPktCount)
+	fmt.Printf("  Packet Status Count: %d\n", twcc.PacketStatusCount)
+	fmt.Printf("  Reference Time: %d\n", twcc.ReferenceTime)
+
+	// Count received packets
+	receivedCount := 0
+	lostCount := 0
+
+	for i, _ := range twcc.PacketChunks {
+		if i >= int(twcc.PacketStatusCount) {
+			break
+		}
+	}
+
+	totalPackets := receivedCount + lostCount
+	packetLossRate := float64(lostCount) / float64(totalPackets) * 100
+
+	fmt.Printf("  Packets: %d received, %d lost (%.1f%% loss)\n",
+		receivedCount, lostCount, packetLossRate)
+
+	// Analyze receive deltas for jitter
+	if len(twcc.RecvDeltas) > 0 {
+		analyzeReceiveDeltas(twcc.RecvDeltas)
+	}
+
+	fmt.Println("  ----------------------------------------")
+}
+
+func analyzeReceiveDeltas(deltas []*rtcp.RecvDelta) {
+	if len(deltas) < 2 {
+		return
+	}
+
+	// Calculate jitter and timing information
+	var totalDelta time.Duration
+	var maxDelta, minDelta time.Duration = 0, time.Hour
+
+	for _, delta := range deltas {
+		deltaDuration := delta.Delta
+		totalDelta += time.Duration(deltaDuration)
+
+		if time.Duration(deltaDuration) > (maxDelta) {
+			maxDelta = time.Duration(deltaDuration)
+		}
+		if time.Duration(deltaDuration) < minDelta {
+			minDelta = time.Duration(deltaDuration)
+		}
+	}
+
+	avgDelta := totalDelta / time.Duration(len(deltas))
+	jitter := maxDelta - minDelta
+
+	fmt.Printf("  Timing Analysis:\n")
+	fmt.Printf("    Avg Delta: %v\n", avgDelta)
+	fmt.Printf("    Jitter: %v (max: %v, min: %v)\n", jitter, maxDelta, minDelta)
+
+	// Warning for high jitter
+	if jitter > 50*time.Millisecond {
+		fmt.Printf("    ⚠️  High jitter detected: %v\n", jitter)
+	}
+}
+
+func analyzeReceiverReport(rr *rtcp.ReceiverReport) {
+	fmt.Printf("📊 Receiver Report:\n")
+	fmt.Printf("  SSRC: %d\n", rr.SSRC)
+
+	for _, report := range rr.Reports {
+		fmt.Printf("  Report for SSRC %d:\n", report.SSRC)
+		fmt.Printf("    Fraction Lost: %d/256 (%.1f%%)\n",
+			report.FractionLost, float64(report.FractionLost)/256*100)
+		fmt.Printf("    Total Lost: %d packets\n", report.TotalLost)
+		fmt.Printf("    Highest Seq: %d\n", report.LastSequenceNumber)
+		fmt.Printf("    Jitter: %d timestamp units\n", report.Jitter)
+	}
+	fmt.Println("  ----------------------------------------")
+}
+
+func analyzeSenderReport(sr *rtcp.SenderReport) {
+	fmt.Printf("📤 Sender Report:\n")
+	fmt.Printf("  SSRC: %d\n", sr.SSRC)
+	fmt.Printf("  NTP Time: %d\n", sr.NTPTime)
+	fmt.Printf("  RTP Time: %d\n", sr.RTPTime)
+	fmt.Printf("  Packet Count: %d\n", sr.PacketCount)
+	fmt.Printf("  Octet Count: %d\n", sr.OctetCount)
+	fmt.Println("  ----------------------------------------")
+}
+
+func analyzeREMBFeedback(remb *rtcp.ReceiverEstimatedMaximumBitrate) {
+	fmt.Printf("📶 REMB Feedback:\n")
+	fmt.Printf("  Sender SSRC: %d\n", remb.SenderSSRC)
+	fmt.Printf("  Bitrate: %.2f Mbps\n", float64(remb.Bitrate)/1_000_000)
+	fmt.Printf("  Media SSRCs: %v\n", remb.SSRCs)
+	fmt.Println("  ----------------------------------------")
 }
