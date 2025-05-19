@@ -8,6 +8,8 @@ require (
 	github.com/harshabose/simple_webrtc_comm/datachannel v0.0.0
 	github.com/harshabose/simple_webrtc_comm/mediasource v0.0.0
 	github.com/harshabose/simple_webrtc_comm/transcode v0.0.0
+	github.com/pion/interceptor v0.1.37
+	github.com/pion/webrtc/v4 v4.0.10
 )
 
 require (
@@ -37,7 +39,6 @@ require (
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v3 v3.0.4 // indirect
 	github.com/pion/ice/v4 v4.0.6 // indirect
-	github.com/pion/interceptor v0.1.37 // indirect
 	github.com/pion/logging v0.2.3 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
@@ -49,7 +50,6 @@ require (
 	github.com/pion/stun/v3 v3.0.0 // indirect
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
-	github.com/pion/webrtc/v4 v4.0.10 // indirect
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

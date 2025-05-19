@@ -4,13 +4,13 @@ import "github.com/asticode/go-astiav"
 
 const (
 	DefaultVideoClockRate uint32 = 90000
-	DefaultVideoWidth     uint16 = 1920
-	DefaultVideoHeight    uint16 = 1080
+	DefaultVideoWidth     uint16 = 1280
+	DefaultVideoHeight    uint16 = 720
 	DefaultPixelFormat           = astiav.PixelFormatYuv420P
 	DefaultVideoFPS       uint8  = 25
 )
 
 const (
-	DefaultSPSBase64 = "AAAAAWdCwCmmgHgCJ+WEAAADAAQAAAMAyjxgyoA="
+	DefaultSPSBase64 = "AAAAAWdCwB+mgFAFuhAAAAMAEAAAAwMo8YMq"
 	DefaultPPSBase64 = "AAAAAWjOPIA="
 )

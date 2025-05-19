@@ -9,10 +9,11 @@ import (
 	"github.com/pion/webrtc/v4"
 
 	"github.com/harshabose/simple_webrtc_comm/client/pkg"
-	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
 	"github.com/harshabose/simple_webrtc_comm/mediasource/pkg"
 	"github.com/harshabose/simple_webrtc_comm/transcode/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 )
 
 func main() {
@@ -27,12 +28,14 @@ func main() {
 
 			drone, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
-				// client.WithBandwidthControlInterceptor(5_000_000, time.Second),
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
-				client.WithSimulcastExtensionHeaders(),
-				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				client.WithBandwidthControlInterceptor(2_500_000, time.Second),
+				client.WithTWCCHeaderExtensionSender(),
+				// client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
+				// client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
+				// client.WithSimulcastExtensionHeaders(),
+				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				client.WithDefaultInterceptorRegistry(),
 			)
 			if err != nil {
 				panic(err)
@@ -44,6 +47,7 @@ func main() {
 				client.WithOfferSignal,
 				client.WithMediaSources(),
 				client.WithDataChannels(),
+				client.WithBandwidthControl(),
 			)
 			if err != nil {
 				panic(err)
@@ -56,13 +60,14 @@ func main() {
 				panic(err)
 			}
 
-			if err := pc.CreateMediaSource("A8-MINI", false,
+			if err := pc.CreateMediaSource("A8-MINI", true,
 				mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline41),
 				mediasource.WithPriority(mediasource.Level5),
 				mediasource.WithStream(
 					mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
 					mediasource.WithDemuxer(
-						"/dev/video0",
+						"0",
+						transcode.WithAvFoundationInputFormatOption,
 						// "rtsp://192.168.144.25:8554/main.264",
 						// transcode.WithRTSPInputOption,
 						transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)*3),
@@ -78,7 +83,7 @@ func main() {
 					mediasource.WithEncoder(
 						astiav.CodecIDH264,
 						transcode.WithEncoderBufferSize(int(delivery.DefaultVideoFPS)*3),
-						transcode.WithX264LowLatencyOptions,
+						transcode.WithWebRTCOptimisedOptions,
 					),
 				),
 			); err != nil {

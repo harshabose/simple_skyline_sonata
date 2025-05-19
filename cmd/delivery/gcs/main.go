@@ -9,8 +9,9 @@ import (
 	"github.com/pion/webrtc/v4"
 
 	"github.com/harshabose/simple_webrtc_comm/client/pkg"
-	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 )
 
 func main() {
@@ -26,10 +27,12 @@ func main() {
 			gcs, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline41, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
-				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
-				client.WithSimulcastExtensionHeaders(),
-				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				// client.WithTWCCHeaderExtensionSender(),
+				// client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
+				// client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
+				// client.WithSimulcastExtensionHeaders(),
+				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				client.WithDefaultInterceptorRegistry(),
 			)
 			if err != nil {
 				panic(err)
