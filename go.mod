@@ -1,14 +1,19 @@
 module github.com/harshabose/simple_webrtc_comm
 
-go 1.23.3
+go 1.24
+
+toolchain go1.24.1
 
 require (
 	github.com/asticode/go-astiav v0.33.1
+	github.com/coder/websocket v1.8.13
 	github.com/harshabose/simple_webrtc_comm/client v0.0.0
 	github.com/harshabose/simple_webrtc_comm/datachannel v0.0.0
 	github.com/harshabose/simple_webrtc_comm/mediasource v0.0.0
 	github.com/harshabose/simple_webrtc_comm/transcode v0.0.0
+	github.com/harshabose/socket-comm v0.0.0-20250522200452-3bc71a16279a
 	github.com/pion/interceptor v0.1.37
+	github.com/pion/rtcp v1.2.15
 	github.com/pion/webrtc/v4 v4.0.10
 )
 
@@ -22,7 +27,6 @@ require (
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	cloud.google.com/go/storage v1.43.0 // indirect
 	firebase.google.com/go v3.13.0+incompatible // indirect
-	github.com/aler9/gomavlib v1.3.0 // indirect
 	github.com/asticode/go-astikit v0.52.0 // indirect
 	github.com/bluenviron/gortsplib/v4 v4.12.3 // indirect
 	github.com/bluenviron/mediacommon v1.14.0 // indirect
@@ -42,7 +46,6 @@ require (
 	github.com/pion/logging v0.2.3 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.15 // indirect
 	github.com/pion/rtp v1.8.11 // indirect
 	github.com/pion/sctp v1.8.36 // indirect
 	github.com/pion/sdp/v3 v3.0.10 // indirect
@@ -50,7 +53,6 @@ require (
 	github.com/pion/stun/v3 v3.0.0 // indirect
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
-	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
@@ -58,12 +60,12 @@ require (
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	google.golang.org/api v0.222.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
@@ -79,6 +81,7 @@ replace (
 	github.com/harshabose/simple_webrtc_comm/datachannel => ./dependencies/datachannel
 	github.com/harshabose/simple_webrtc_comm/mediasink => ./dependencies/mediasink
 	github.com/harshabose/simple_webrtc_comm/mediasource => ./dependencies/mediasource
+	github.com/harshabose/simple_webrtc_comm/socket-comm => ./dependencies/socket-comm
 	github.com/harshabose/simple_webrtc_comm/transcode => ./dependencies/transcode
 	github.com/harshabose/tools/buffer => ./dependencies/tools/buffer
 )

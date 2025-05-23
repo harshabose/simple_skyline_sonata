@@ -38,6 +38,10 @@ FFMPEG_SRC_DIR := $(FFMPEG_DIRECTORY)/src
 X264_DIRECTORY := $(THIRD_PARTY_DIR)/x264
 X264_SRC_DIR := $(X264_DIRECTORY)/src
 
+# VARIABLES FOR VPX
+VPX_DIRECTORY := $(THIRD_PARTY_DIR)/vpx
+VPX_SRC_DIR := $(VPX_DIRECTORY)/src
+
 OPUS_DIRECTORY := $(THIRD_PARTY_DIR)/libopus
 OPUS_SRC_DIR := $(OPUS_DIRECTORY)/src
 
@@ -51,10 +55,14 @@ MAVP2P_INSTALL_DIR := $(THIRD_PARTY_DIR)/mavp2p
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-COMPILE_ENV := CGO_LDFLAGS="-L$(FFMPEG_DIRECTORY)/lib -L$(X264_DIRECTORY)/lib" \
-               CGO_CFLAGS="-I$(FFMPEG_DIRECTORY)/include -I$(X264_DIRECTORY)/include" \
-               PKG_CONFIG_PATH="$(FFMPEG_DIRECTORY)/lib/pkgconfig:$(X264_DIRECTORY)/lib/pkgconfig" \
-               LD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib$LD_LIBRARY_PATH"
+
+COMPILE_ENV := CGO_LDFLAGS="-L$(FFMPEG_DIRECTORY)/lib -L$(X264_DIRECTORY)/lib -L$(VPX_DIRECTORY)/lib" \
+               CGO_CFLAGS="-I$(FFMPEG_DIRECTORY)/include -I$(X264_DIRECTORY)/include -I$(VPX_DIRECTORY)/include" \
+               PKG_CONFIG_PATH="$(FFMPEG_DIRECTORY)/lib/pkgconfig:$(X264_DIRECTORY)/lib/pkgconfig:$(VPX_DIRECTORY)/lib/pkgconfig" \
+               LD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib:$(VPX_DIRECTORY)/lib:$$LD_LIBRARY_PATH"
+
+RUNTIME_ENV_MACOS := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV) \
+                     DYLD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib:$(VPX_DIRECTORY)/lib"
 
 FIREBASE_ENV := FIREBASE_TYPE=service_account \
                 FIREBASE_PROJECT_ID=iitb-rgstc-signalling-server \
@@ -78,7 +86,7 @@ NETWORK_ENV := STUN_SERVER_URL=stun:stun.skyline-sonata.in:3478 \
 HARDWARE_ENV := MAVP2P_EXE_PATH=$(MAVP2P_INSTALL_DIR)/mavp2p \
                 MAVLINK_SERIAL=/dev/ttyTHS0:115200
 
-RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV)
+RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV) $(RUNTIME_ENV_MACOS)
 
 WINDOWS_RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV)
 
@@ -130,6 +138,47 @@ install-libx264:
             --enable-pic
 	cd $(X264_SRC_DIR) && make -j$(nproc)
 	cd $(X264_SRC_DIR) && make install
+
+install-libvpx-darwin:
+	echo "Installing libvpx for macOS ARM64..."
+	mkdir -p $(VPX_DIRECTORY)
+	mkdir -p $(VPX_SRC_DIR)
+	cd $(VPX_DIRECTORY) && rm -rf $(VPX_SRC_DIR)
+	mkdir -p $(VPX_SRC_DIR)
+	echo "Cloning libvpx (this may take several minutes)..."
+	cd $(VPX_SRC_DIR) && git clone https://chromium.googlesource.com/webm/libvpx .
+	cd $(VPX_SRC_DIR) && git checkout v1.14.0
+	cd $(VPX_SRC_DIR) && MACOSX_DEPLOYMENT_TARGET=10.15 ./configure \
+		--target=arm64-darwin20-gcc \
+		--prefix=$(VPX_DIRECTORY) \
+        --enable-shared \
+        --disable-static \
+        --enable-pic \
+        --enable-vp8 \
+        --enable-vp9 \
+      	--enable-vp8-encoder \
+        --enable-vp9-encoder \
+        --enable-vp8-decoder \
+        --enable-vp9-decoder \
+        --enable-runtime-cpu-detect \
+        --enable-multithread \
+        --disable-examples \
+        --disable-tools \
+        --disable-docs \
+        --disable-unit-tests \
+        --disable-debug \
+        --enable-optimizations \
+        --extra-cflags="-mmacosx-version-min=10.15" \
+        --extra-cxxflags="-mmacosx-version-min=10.15"
+		cd $(VPX_SRC_DIR) && make clean
+		cd $(VPX_SRC_DIR) && make -j$(shell sysctl -n hw.ncpu)
+		cd $(VPX_SRC_DIR) && make install
+	if [ ! -d "$(VPX_DIRECTORY)/lib" ]; then \
+		echo "libvpx installation failed: lib directory not found"; \
+		exit 1; \
+	fi
+	echo "libvpx installation complete."
+
 
 install-libopus:
 	mkdir -p $(OPUS_SRC_DIR)
@@ -188,16 +237,20 @@ install-ffmpeg-darwin:
 	echo "Cloning FFmpeg (this may take several minutes)..."
 	cd $(FFMPEG_SRC_DIR) && git clone --progress https://github.com/FFmpeg/FFmpeg .
 	cd $(FFMPEG_SRC_DIR) && git checkout $(FFMPEG_VERSION)
-	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig" ./configure \
+	cd $(FFMPEG_SRC_DIR) && PKG_CONFIG_PATH="$(X264_DIRECTORY)/lib/pkgconfig:$(VPX_DIRECTORY)/lib/pkgconfig" ./configure \
 		--prefix=$(FFMPEG_DIRECTORY) \
 		--enable-gpl \
 		--enable-ffplay \
-        --enable-libx264 \
-        --enable-shared \
-        --enable-version3 \
-        --enable-pic \
-        --extra-cflags="-I$(X264_DIRECTORY)/include" \
-		--extra-ldflags="-L$(X264_DIRECTORY)/lib"
+		--enable-libx264 \
+		--enable-libvpx \
+		--enable-nonfree \
+		--enable-decoder=libvpx_vp8 \
+		--enable-decoder=libvpx_vp9 \
+		--enable-shared \
+		--enable-version3 \
+		--enable-pic \
+		--extra-cflags="-I$(X264_DIRECTORY)/include -I$(VPX_DIRECTORY)/include" \
+		--extra-ldflags="-L$(X264_DIRECTORY)/lib -L$(VPX_DIRECTORY)/lib"
 	cd $(FFMPEG_SRC_DIR) && make -j$(nproc)
 	cd $(FFMPEG_SRC_DIR) && make install
 	if [ ! -d "$(FFMPEG_DIRECTORY)/lib" ]; then \

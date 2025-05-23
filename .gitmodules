@@ -16,3 +16,6 @@
 [submodule "dependencies/tools/buffer"]
 	path = dependencies/tools/buffer
 	url = https://github.com/harshabose/buffer.git
+[submodule "dependencies/socket-comm"]
+	path = dependencies/socket-comm
+	url = https://github.com/harshabose/socket-comm.git

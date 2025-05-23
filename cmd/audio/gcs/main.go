@@ -37,7 +37,7 @@ func main() {
 			pc, err := gcs.CreatePeerConnection(
 				"MAIN",
 				client.WithRTCConfiguration(client.GetRTCConfiguration()),
-				client.WithAnswerSignal,
+				client.WithFirebaseAnswerSignal,
 				client.WithMediaSources(),
 				client.WithMediaSinks(),
 				client.WithDataChannels(),

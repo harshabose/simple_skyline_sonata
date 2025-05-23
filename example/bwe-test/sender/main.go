@@ -11,20 +11,14 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/pion/interceptor"
-	"github.com/pion/interceptor/pkg/cc"
-	"github.com/pion/interceptor/pkg/gcc"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/pkg/media"
-	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
 )
 
 const (
@@ -40,245 +34,246 @@ const (
 	ivfHeaderSize = 32
 )
 
-func main() { //nolint:gocognit,cyclop,maintidx
-	qualityLevels := []struct {
-		fileName string
-		bitrate  int
-	}{
-		{lowFile, lowBitrate},
-		{medFile, medBitrate},
-		{highFile, highBitrate},
-	}
-	currentQuality := 0
-
-	// Check if IVF files exist
-	fmt.Println("🎬 Checking for video files...")
-	for _, level := range qualityLevels {
-		_, err := os.Stat(level.fileName)
-		if os.IsNotExist(err) {
-			panic(fmt.Sprintf("❌ File %s was not found", level.fileName))
-		}
-		fmt.Printf("✓ Found %s\n", level.fileName)
-	}
-
-	// Setup WebRTC
-	fmt.Println("\n🔧 Setting up WebRTC...")
-	interceptorRegistry := &interceptor.Registry{}
-	mediaEngine := &webrtc.MediaEngine{}
-	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-
-	congestionController, err := cc.NewInterceptor(func() (cc.BandwidthEstimator, error) {
-		return gcc.NewSendSideBWE(gcc.SendSideBWEInitialBitrate(lowBitrate))
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	estimatorChan := make(chan cc.BandwidthEstimator, 1)
-	congestionController.OnNewPeerConnection(func(id string, estimator cc.BandwidthEstimator) { // nolint: revive
-		estimatorChan <- estimator
-	})
-
-	interceptorRegistry.Add(congestionController)
-	if err = webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
-		panic(err)
-	}
-
-	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
-		panic(err)
-	}
-
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(
-		webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine),
-	).NewPeerConnection(webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if cErr := peerConnection.Close(); cErr != nil {
-			fmt.Printf("cannot close peerConnection: %v\n", cErr)
-		}
-	}()
-
-	// Wait until our Bandwidth Estimator has been created
-	estimator := <-estimatorChan
-
-	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion",
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	rtpSender, err := peerConnection.AddTrack(videoTrack)
-	if err != nil {
-		panic(err)
-	}
-
-	// Read incoming RTCP packets
-	go func() {
-		readRTCPWithAnalysis(rtpSender)
-		// rtcpBuf := make([]byte, 1500)
-		// for {
-		// 	if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
-		// 		return
-		// 	}
-		// }
-	}()
-
-	// Set the handler for ICE connection state
-	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("🔗 ICE Connection State: %s\n", connectionState.String())
-	})
-
-	// Set the handler for Peer connection state
-	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
-	})
-
-	// ================================
-	// FILE-BASED SDP EXCHANGE
-	// ================================
-
-	fmt.Println("\n=======================================================")
-	fmt.Println("🎥 WebRTC Bandwidth Estimation Demo (File-based SDP)")
-	fmt.Println("=======================================================")
-	fmt.Println("Choose your role:")
-	fmt.Println("1. Create an offer (generate offer.txt)")
-	fmt.Println("2. Wait for an offer (read offer.txt and generate answer.txt)")
-	fmt.Print("Enter choice (1 or 2): ")
-
-	choice := readInput()
-
-	var isOfferer bool
-	switch strings.TrimSpace(choice) {
-	case "1":
-		isOfferer = true
-		fmt.Println("✓ You chose to create an offer")
-	case "2":
-		isOfferer = false
-		fmt.Println("✓ You chose to wait for an offer")
-	default:
-		panic("Invalid choice. Please enter 1 or 2.")
-	}
-
-	// File-based SDP exchange
-	if isOfferer {
-		handleOffererFlow(peerConnection)
-	} else {
-		handleAnswererFlow(peerConnection)
-	}
-
-	fmt.Println("\n🎬 Starting video streaming with bandwidth adaptation...")
-	fmt.Println("📊 Monitor bandwidth changes and quality switching...")
-	fmt.Println("Press Ctrl+C to stop")
-
-	// ================================
-	// VIDEO STREAMING WITH BWE
-	// ================================
-
-	// Open initial IVF file
-	file, err := os.Open(qualityLevels[currentQuality].fileName)
-	if err != nil {
-		panic(err)
-	}
-
-	ivf, header, err := ivfreader.NewWith(file)
-	if err != nil {
-		panic(err)
-	}
-
-	// Calculate frame timing based on IVF header
-	ticker := time.NewTicker(
-		time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000),
-	)
-	defer ticker.Stop()
-
-	frame := []byte{}
-	frameHeader := &ivfreader.IVFFrameHeader{}
-	currentTimestamp := uint64(0)
-	frameCount := 0
-
-	switchQualityLevel := func(newQualityLevel int) {
-		fmt.Printf("🔄 Switching quality: %s (%.1f Mbps) → %s (%.1f Mbps)\n",
-			qualityLevels[currentQuality].fileName, float64(qualityLevels[currentQuality].bitrate)/1_000_000,
-			qualityLevels[newQualityLevel].fileName, float64(qualityLevels[newQualityLevel].bitrate)/1_000_000,
-		)
-
-		currentQuality = newQualityLevel
-		ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
-
-		// Find a suitable frame to start from (keyframe preferred)
-		for {
-			if frame, frameHeader, err = ivf.ParseNextFrame(); err != nil {
-				break
-			} else if frameHeader.Timestamp >= currentTimestamp && frame[0]&0x1 == 0 {
-				break
-			}
-		}
-	}
-
-	// Start streaming loop
-	// lastBitrateReport := time.Now()
-	for ; true; <-ticker.C {
-		targetBitrate := estimator.GetTargetBitrate()
-
-		// Report bitrate every 5 seconds
-		// if time.Since(lastBitrateReport) > 5*time.Second {
-		fmt.Printf("📊 Target bitrate: %f Mbps | Current quality: %s | Frames sent: %d\n",
-			float64(targetBitrate)/1000000,
-			qualityLevels[currentQuality].fileName,
-			frameCount,
-		)
-		// lastBitrateReport = time.Now()
-		// }
-
-		// Bandwidth-based quality switching
-		switch {
-		// Downgrade quality if target bitrate is below current level
-		case currentQuality != 0 && targetBitrate < qualityLevels[currentQuality].bitrate:
-			switchQualityLevel(currentQuality - 1)
-
-		// Upgrade quality if target bitrate is above next level
-		case len(qualityLevels) > (currentQuality+1) && targetBitrate > qualityLevels[currentQuality+1].bitrate:
-			switchQualityLevel(currentQuality + 1)
-
-		// Normal frame processing
-		default:
-			frame, frameHeader, err = ivf.ParseNextFrame()
-		}
-
-		switch {
-		// Loop the video when we reach the end
-		case errors.Is(err, io.EOF):
-			ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
-
-		// Send the frame
-		case err == nil:
-			currentTimestamp = frameHeader.Timestamp
-			if err = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
-				// Don't panic on frame errors, just log them
-				fmt.Printf("⚠ Error sending frame: %v\n", err)
-			} else {
-				frameCount++
-			}
-
-		// Handle other errors
-		default:
-			fmt.Printf("⚠ Frame parsing error: %v\n", err)
-		}
-	}
-}
+// func main() { //nolint:gocognit,cyclop,maintidx
+// 	qualityLevels := []struct {
+// 		fileName string
+// 		bitrate  int
+// 	}{
+// 		{lowFile, lowBitrate},
+// 		{medFile, medBitrate},
+// 		{highFile, highBitrate},
+// 	}
+// 	currentQuality := 0
+//
+// 	// Check if IVF files exist
+// 	fmt.Println("🎬 Checking for video files...")
+// 	for _, level := range qualityLevels {
+// 		_, err := os.Stat(level.fileName)
+// 		if os.IsNotExist(err) {
+// 			panic(fmt.Sprintf("❌ File %s was not found", level.fileName))
+// 		}
+// 		fmt.Printf("✓ Found %s\n", level.fileName)
+// 	}
+//
+// 	// Setup WebRTC
+// 	fmt.Println("\n🔧 Setting up WebRTC...")
+// 	interceptorRegistry := &interceptor.Registry{}
+// 	mediaEngine := &webrtc.MediaEngine{}
+// 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	congestionController, err := cc.NewInterceptor(func() (cc.BandwidthEstimator, error) {
+// 		return gcc.NewSendSideBWE(gcc.SendSideBWEInitialBitrate(lowBitrate))
+// 	})
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	estimatorChan := make(chan cc.BandwidthEstimator, 1)
+// 	congestionController.OnNewPeerConnection(func(id string, estimator cc.BandwidthEstimator) { // nolint: revive
+// 		estimatorChan <- estimator
+// 	})
+//
+// 	interceptorRegistry.Add(congestionController)
+// 	if err = webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	// Create a new RTCPeerConnection
+// 	peerConnection, err := webrtc.NewAPI(
+// 		webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine),
+// 	).NewPeerConnection(webrtc.Configuration{
+// 		ICEServers: []webrtc.ICEServer{
+// 			{
+// 				URLs: []string{"stun:stun.l.google.com:19302"},
+// 			},
+// 		},
+// 	})
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	defer func() {
+// 		if cErr := peerConnection.Close(); cErr != nil {
+// 			fmt.Printf("cannot close peerConnection: %v\n", cErr)
+// 		}
+// 	}()
+//
+// 	// Wait until our Bandwidth Estimator has been created
+// 	estimator := <-estimatorChan
+//
+// 	// Create a video track
+// 	videoTrack, err := webrtc.NewTrackLocalStaticSample(
+// 		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion",
+// 	)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	rtpSender, err := peerConnection.AddTrack(videoTrack)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	// Read incoming RTCP packets
+// 	go func() {
+// 		readRTCPWithAnalysis(rtpSender)
+// 		// rtcpBuf := make([]byte, 1500)
+// 		// for {
+// 		// 	if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+// 		// 		return
+// 		// 	}
+// 		// }
+// 	}()
+//
+// 	// Set the handler for ICE connection state
+// 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
+// 		fmt.Printf("🔗 ICE Connection State: %s\n", connectionState.String())
+// 	})
+//
+// 	// Set the handler for Peer connection state
+// 	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+// 		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
+// 	})
+//
+// 	// ================================
+// 	// FILE-BASED SDP EXCHANGE
+// 	// ================================
+//
+// 	fmt.Println("\n=======================================================")
+// 	fmt.Println("🎥 WebRTC Bandwidth Estimation Demo (File-based SDP)")
+// 	fmt.Println("=======================================================")
+// 	fmt.Println("Choose your role:")
+// 	fmt.Println("1. Create an offer (generate offer.txt)")
+// 	fmt.Println("2. Wait for an offer (read offer.txt and generate answer.txt)")
+// 	fmt.Print("Enter choice (1 or 2): ")
+//
+// 	choice := readInput()
+//
+// 	var isOfferer bool
+// 	switch strings.TrimSpace(choice) {
+// 	case "1":
+// 		isOfferer = true
+// 		fmt.Println("✓ You chose to create an offer")
+// 	case "2":
+// 		isOfferer = false
+// 		fmt.Println("✓ You chose to wait for an offer")
+// 	default:
+// 		panic("Invalid choice. Please enter 1 or 2.")
+// 	}
+//
+// 	// File-based SDP exchange
+// 	if isOfferer {
+// 		handleOffererFlow(peerConnection)
+// 	} else {
+// 		handleAnswererFlow(peerConnection)
+// 	}
+//
+// 	fmt.Println("\n🎬 Starting video streaming with bandwidth adaptation...")
+// 	fmt.Println("📊 Monitor bandwidth changes and quality switching...")
+// 	fmt.Println("Press Ctrl+C to stop")
+//
+// 	// ================================
+// 	// VIDEO STREAMING WITH BWE
+// 	// ================================
+//
+// 	// Open initial IVF file
+// 	file, err := os.Open(qualityLevels[currentQuality].fileName)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	ivf, header, err := ivfreader.NewWith(file)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	// Calculate frame timing based on IVF header
+// 	ticker := time.NewTicker(
+// 		time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000),
+// 	)
+// 	defer ticker.Stop()
+//
+// 	frame := []byte{}
+// 	frameHeader := &ivfreader.IVFFrameHeader{}
+// 	currentTimestamp := uint64(0)
+// 	frameCount := 0
+//
+// 	switchQualityLevel := func(newQualityLevel int) {
+// 		fmt.Printf("🔄 Switching quality: %s (%.1f Mbps) → %s (%.1f Mbps)\n",
+// 			qualityLevels[currentQuality].fileName, float64(qualityLevels[currentQuality].bitrate)/1_000_000,
+// 			qualityLevels[newQualityLevel].fileName, float64(qualityLevels[newQualityLevel].bitrate)/1_000_000,
+// 		)
+//
+// 		currentQuality = newQualityLevel
+// 		ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
+//
+// 		// Find a suitable frame to start from (keyframe preferred)
+// 		for {
+// 			if frame, frameHeader, err = ivf.ParseNextFrame(); err != nil {
+// 				break
+// 			} else if frameHeader.Timestamp >= currentTimestamp && frame[0]&0x1 == 0 {
+// 				break
+// 			}
+// 		}
+// 	}
+//
+// 	// Start streaming loop
+// 	// lastBitrateReport := time.Now()
+// 	for ; true; <-ticker.C {
+// 		targetBitrate := estimator.GetTargetBitrate()
+//
+// 		// Report bitrate every 5 seconds
+// 		// if time.Since(lastBitrateReport) > 5*time.Second {
+// 		fmt.Printf("📊 Target bitrate: %f Mbps | Current quality: %s | Frames sent: %d\n",
+// 			float64(targetBitrate)/1000000,
+// 			qualityLevels[currentQuality].fileName,
+// 			frameCount,
+// 		)
+// 		targetBitrate = lowBitrate
+// 		// lastBitrateReport = time.Now()
+// 		// }
+//
+// 		// Bandwidth-based quality switching
+// 		switch {
+// 		// Downgrade quality if target bitrate is below current level
+// 		case currentQuality != 0 && targetBitrate < qualityLevels[currentQuality].bitrate:
+// 			switchQualityLevel(currentQuality - 1)
+//
+// 		// Upgrade quality if target bitrate is above next level
+// 		case len(qualityLevels) > (currentQuality+1) && targetBitrate > qualityLevels[currentQuality+1].bitrate:
+// 			switchQualityLevel(currentQuality + 1)
+//
+// 		// Normal frame processing
+// 		default:
+// 			frame, frameHeader, err = ivf.ParseNextFrame()
+// 		}
+//
+// 		switch {
+// 		// Loop the video when we reach the end
+// 		case errors.Is(err, io.EOF):
+// 			ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
+//
+// 		// Send the frame
+// 		case err == nil:
+// 			currentTimestamp = frameHeader.Timestamp
+// 			if err = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
+// 				// Don't panic on frame errors, just log them
+// 				fmt.Printf("⚠ Error sending frame: %v\n", err)
+// 			} else {
+// 				frameCount++
+// 			}
+//
+// 		// Handle other errors
+// 		default:
+// 			fmt.Printf("⚠ Frame parsing error: %v\n", err)
+// 		}
+// 	}
+// }
 
 // Handle the offerer (initiator) flow
 func handleOffererFlow(pc *webrtc.PeerConnection) {

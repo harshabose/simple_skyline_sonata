@@ -41,7 +41,7 @@ func main() {
 			pc, err := drone.CreatePeerConnection(
 				"MAIN",
 				client.WithRTCConfiguration(client.GetRTCConfiguration()),
-				client.WithOfferSignal,
+				client.WithFirebaseOfferSignal,
 				client.WithMediaSources(),
 				client.WithMediaSinks(),
 				client.WithDataChannels(),

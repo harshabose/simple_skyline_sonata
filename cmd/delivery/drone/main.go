@@ -29,7 +29,9 @@ func main() {
 			drone, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				client.WithBandwidthControlInterceptor(2_500_000, time.Second),
+				// client.WithDefaultMediaEngine(),
+				// client.WithVP8MediaEngine(delivery.DefaultVideoClockRate),
+				client.WithBandwidthControlInterceptor(300_000, time.Second),
 				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
@@ -43,7 +45,7 @@ func main() {
 			pc, err := drone.CreatePeerConnection(
 				"MAIN",
 				client.WithRTCConfiguration(client.GetRTCConfiguration()),
-				client.WithOfferSignal,
+				client.WithFirebaseOfferSignal,
 				client.WithMediaSources(),
 				client.WithDataChannels(),
 				client.WithBandwidthControl(),
@@ -59,8 +61,9 @@ func main() {
 				panic(err)
 			}
 
-			if err := pc.CreateMediaSource("A8-MINI", true,
+			if _, err := pc.CreateMediaSource("A8-MINI", true,
 				mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31),
+				// mediasource.WithVP8Track(delivery.DefaultVideoClockRate),
 				mediasource.WithPriority(mediasource.Level5),
 				mediasource.WithStream(
 					mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),

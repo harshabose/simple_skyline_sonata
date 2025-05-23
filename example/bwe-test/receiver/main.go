@@ -9,136 +9,135 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 )
 
-func main() {
-	// Show current working directory for debugging
-	cwd, _ := os.Getwd()
-	fmt.Printf("📁 Current working directory: %s\n", cwd)
-
-	fmt.Println("\n🔧 Setting up WebRTC...")
-	interceptorRegistry := &interceptor.Registry{}
-	mediaEngine := &webrtc.MediaEngine{}
-	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-
-	if err := webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
-		panic(err)
-	}
-
-	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
-		panic(err)
-	}
-
-	peerConnection, err := webrtc.NewAPI(
-		webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine),
-	).NewPeerConnection(webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := peerConnection.Close(); err != nil {
-			fmt.Printf("cannot close peerConnection: %v\n", err)
-		}
-	}()
-
-	peerConnection.OnTrack(func(remote *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		fmt.Printf("📹 Received track: %s (SSRC: %d)\n", remote.Kind(), remote.SSRC())
-
-		// Read RTP packets from track
-		go func() {
-			for {
-				_, _, err := remote.ReadRTP()
-				if err != nil {
-					return
-				}
-				// Track received packets for debugging
-			}
-		}()
-	})
-
-	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		fmt.Printf("🔗 ICE Connection State: %s\n", state.String())
-	})
-
-	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
-	})
-
-	// Try multiple possible locations for offer.txt
-	possiblePaths := []string{
-		"offer.txt",    // Same directory
-		"../offer.txt", // Parent directory
-		"../sender/offer.txt",
-		"../../offer.txt", // Grandparent directory
-		"./offer.txt",     // Explicit current directory
-	}
-
-	fmt.Println("\n📥 Looking for offer.txt...")
-	var offerPath string
-	for _, path := range possiblePaths {
-		absPath, _ := filepath.Abs(path)
-		fmt.Printf("🔍 Checking: %s\n", absPath)
-		if _, err := os.Stat(path); err == nil {
-			offerPath = path
-			fmt.Printf("✓ Found offer.txt at: %s\n", absPath)
-			break
-		}
-	}
-
-	if offerPath == "" {
-		fmt.Println("\n❌ offer.txt not found in any expected location")
-		fmt.Println("📋 Please place offer.txt in one of these locations:")
-		for _, path := range possiblePaths {
-			absPath, _ := filepath.Abs(path)
-			fmt.Printf("   - %s\n", absPath)
-		}
-		fmt.Println("\nPress Enter to check again...")
-		waitForFile(possiblePaths)
-	}
-
-	// Load offer from file
-	offer := loadSDPFromFile(offerPath)
-	if err := peerConnection.SetRemoteDescription(offer); err != nil {
-		panic(fmt.Sprintf("❌ Error setting remote description: %v", err))
-	}
-
-	// Create answer
-	fmt.Println("⚡ Creating answer...")
-	answer, err := peerConnection.CreateAnswer(nil)
-	if err != nil {
-		panic(err)
-	}
-
-	// Wait for ICE gathering
-	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
-	if err = peerConnection.SetLocalDescription(answer); err != nil {
-		panic(err)
-	}
-
-	fmt.Println("⏳ Gathering ICE candidates...")
-	<-gatherComplete
-	fmt.Println("✓ ICE gathering complete")
-
-	// Save answer in the same directory as offer
-	answerPath := filepath.Join(filepath.Dir(offerPath), "../sender/answer.txt")
-	saveSDPToFile(peerConnection.LocalDescription(), answerPath)
-
-	fmt.Println("\n✓ Receiver setup complete. Waiting for connection...")
-	fmt.Println("Press Ctrl+C to exit")
-
-	// Keep the program running
-	select {}
-}
+// func main() {
+// 	// Show current working directory for debugging
+// 	cwd, _ := os.Getwd()
+// 	fmt.Printf("📁 Current working directory: %s\n", cwd)
+//
+// 	fmt.Println("\n🔧 Setting up WebRTC...")
+// 	interceptorRegistry := &interceptor.Registry{}
+// 	mediaEngine := &webrtc.MediaEngine{}
+// 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	if err := webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	peerConnection, err := webrtc.NewAPI(
+// 		webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine),
+// 	).NewPeerConnection(webrtc.Configuration{
+// 		ICEServers: []webrtc.ICEServer{
+// 			{
+// 				URLs: []string{"stun:stun.l.google.com:19302"},
+// 			},
+// 		},
+// 	})
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	defer func() {
+// 		if err := peerConnection.Close(); err != nil {
+// 			fmt.Printf("cannot close peerConnection: %v\n", err)
+// 		}
+// 	}()
+//
+// 	peerConnection.OnTrack(func(remote *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+// 		fmt.Printf("📹 Received track: %s (SSRC: %d)\n", remote.Kind(), remote.SSRC())
+//
+// 		// Read RTP packets from track
+// 		go func() {
+// 			for {
+// 				_, _, err := remote.ReadRTP()
+// 				if err != nil {
+// 					return
+// 				}
+// 				// Track received packets for debugging
+// 			}
+// 		}()
+// 	})
+//
+// 	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+// 		fmt.Printf("🔗 ICE Connection State: %s\n", state.String())
+// 	})
+//
+// 	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+// 		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
+// 	})
+//
+// 	// Try multiple possible locations for offer.txt
+// 	possiblePaths := []string{
+// 		"offer.txt",    // Same directory
+// 		"../offer.txt", // Parent directory
+// 		"../sender/offer.txt",
+// 		"../../offer.txt", // Grandparent directory
+// 		"./offer.txt",     // Explicit current directory
+// 	}
+//
+// 	fmt.Println("\n📥 Looking for offer.txt...")
+// 	var offerPath string
+// 	for _, path := range possiblePaths {
+// 		absPath, _ := filepath.Abs(path)
+// 		fmt.Printf("🔍 Checking: %s\n", absPath)
+// 		if _, err := os.Stat(path); err == nil {
+// 			offerPath = path
+// 			fmt.Printf("✓ Found offer.txt at: %s\n", absPath)
+// 			break
+// 		}
+// 	}
+//
+// 	if offerPath == "" {
+// 		fmt.Println("\n❌ offer.txt not found in any expected location")
+// 		fmt.Println("📋 Please place offer.txt in one of these locations:")
+// 		for _, path := range possiblePaths {
+// 			absPath, _ := filepath.Abs(path)
+// 			fmt.Printf("   - %s\n", absPath)
+// 		}
+// 		fmt.Println("\nPress Enter to check again...")
+// 		waitForFile(possiblePaths)
+// 	}
+//
+// 	// Load offer from file
+// 	offer := loadSDPFromFile(offerPath)
+// 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
+// 		panic(fmt.Sprintf("❌ Error setting remote description: %v", err))
+// 	}
+//
+// 	// Create answer
+// 	fmt.Println("⚡ Creating answer...")
+// 	answer, err := peerConnection.CreateAnswer(nil)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+//
+// 	// Wait for ICE gathering
+// 	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+// 	if err = peerConnection.SetLocalDescription(answer); err != nil {
+// 		panic(err)
+// 	}
+//
+// 	fmt.Println("⏳ Gathering ICE candidates...")
+// 	<-gatherComplete
+// 	fmt.Println("✓ ICE gathering complete")
+//
+// 	// Save answer in the same directory as offer
+// 	answerPath := filepath.Join(filepath.Dir(offerPath), "../sender/answer.txt")
+// 	saveSDPToFile(peerConnection.LocalDescription(), answerPath)
+//
+// 	fmt.Println("\n✓ Receiver setup complete. Waiting for connection...")
+// 	fmt.Println("Press Ctrl+C to exit")
+//
+// 	// Keep the program running
+// 	select {}
+// }
 
 // Wait for file to exist in any of the possible locations
 func waitForFile(possiblePaths []string) string {
