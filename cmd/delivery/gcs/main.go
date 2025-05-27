@@ -39,7 +39,7 @@ func main() {
 			pc, err := gcs.CreatePeerConnection(
 				"MAIN",
 				client.WithRTCConfiguration(client.GetRTCConfiguration()),
-				client.WithFirebaseAnswerSignal,
+				client.WithFileAnswerSignal("/home/harshabose/GolandProjects/simple_skyline_sonata/cmd/delivery/exchange", "/home/harshabose/GolandProjects/simple_skyline_sonata/cmd/delivery/exchange"),
 				client.WithMediaSinks(),
 				client.WithDataChannels(),
 			)

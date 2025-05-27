@@ -349,3 +349,151 @@ run-audio-gcs:
 	echo "Running audio gcs..."
 	cd $(BUILD_DIR)/audio/gcs && \
 	$(RUNTIME_ENV) ./skyline_sonata.audio.gcs
+
+# Network namespace testing targets
+run-delivery-drone-with-args:
+	echo "Running delivery drone with arguments: $(ARGS)"
+	cd $(BUILD_DIR)/delivery/drone && \
+	$(RUNTIME_ENV) ./skyline_sonata.delivery.drone $(ARGS)
+
+run-delivery-gcs-with-args:
+	echo "Running delivery gcs with arguments: $(ARGS)"
+	cd $(BUILD_DIR)/delivery/gcs && \
+	$(RUNTIME_ENV) ./skyline_sonata.delivery.gcs $(ARGS)
+
+# Network namespace setup
+setup-test-network:
+	echo "Setting up test network namespace..."
+	# Clean up any existing setup first
+	sudo tc qdisc del dev veth0 root 2>/dev/null || true
+	sudo ip link del veth0 2>/dev/null || true
+	sudo ip netns del testns 2>/dev/null || true
+	# Create fresh setup
+	sudo ip netns add testns
+	sudo ip link add veth0 type veth peer name veth1
+	sudo ip link set veth1 netns testns
+	sudo ip addr add 192.168.100.1/24 dev veth0 || true
+	sudo ip link set veth0 up
+	sudo ip netns exec testns ip addr add 192.168.100.2/24 dev veth1 || true
+	sudo ip netns exec testns ip link set veth1 up
+	sudo ip netns exec testns ip link set lo up
+	echo "Test network ready: Main(192.168.100.1) ↔ Namespace(192.168.100.2)"
+	echo "Testing connectivity..."
+	ping -c 2 192.168.100.2
+
+# Apply network conditions
+apply-network-conditions:
+	echo "Applying network conditions: $(CONDITIONS)"
+	sudo tc qdisc del dev veth0 root 2>/dev/null || true
+	sudo tc qdisc add dev veth0 root $(CONDITIONS)
+	echo "Applied: $(CONDITIONS)"
+
+# Predefined network conditions
+apply-poor-network:
+	$(MAKE) apply-network-conditions CONDITIONS="netem delay 200ms loss 3% rate 500kbit"
+
+apply-mobile-network:
+	$(MAKE) apply-network-conditions CONDITIONS="netem delay 80ms 20ms loss 1% rate 2mbit"
+
+apply-good-network:
+	$(MAKE) apply-network-conditions CONDITIONS="netem delay 50ms loss 0.5% rate 10mbit"
+
+apply-bandwidth-limit:
+	$(MAKE) apply-network-conditions CONDITIONS="tbf rate $(RATE) burst 32kbit latency 400ms"
+
+# Run in namespace (server side)
+run-delivery-drone-in-namespace:
+	echo "Running delivery drone in test namespace (server)..."
+	sudo ip netns exec testns bash -c "cd $(BUILD_DIR)/delivery/drone && $(RUNTIME_ENV) ./skyline_sonata.delivery.drone $(ARGS)"
+
+run-delivery-gcs-in-namespace:
+	echo "Running delivery gcs in test namespace (server)..."
+	sudo ip netns exec testns bash -c "cd $(BUILD_DIR)/delivery/gcs && $(RUNTIME_ENV) ./skyline_sonata.delivery.gcs $(ARGS)"
+
+# Complete test scenarios
+test-scenario-bandwidth-degradation:
+	echo "=== Testing Bandwidth Degradation Scenario ==="
+	$(MAKE) apply-good-network
+	echo "Phase 1: Good network (10Mbps) - Run your apps now, press Enter when ready for next phase"
+	read
+	$(MAKE) apply-mobile-network
+	echo "Phase 2: Mobile network (2Mbps) - Press Enter for next phase"
+	read
+	$(MAKE) apply-poor-network
+	echo "Phase 3: Poor network (500kbps) - Press Enter to finish"
+	read
+
+test-scenario-packet-loss:
+	echo "=== Testing Packet Loss Scenario ==="
+	$(MAKE) apply-network-conditions CONDITIONS="netem rate 1mbit loss 1%"
+	echo "Phase 1: 1% packet loss - Press Enter for next phase"
+	read
+	$(MAKE) apply-network-conditions CONDITIONS="netem rate 1mbit loss 5%"
+	echo "Phase 2: 5% packet loss - Press Enter to finish"
+	read
+
+# Cleanup
+cleanup-test-network:
+	echo "Cleaning up test network..."
+	sudo tc qdisc del dev veth0 root 2>/dev/null || true
+	sudo ip link del veth0 2>/dev/null || true
+	sudo ip netns del testns 2>/dev/null || true
+	echo "Test network cleaned up"
+
+# Helper targets
+show-network-status:
+	echo "=== Network Status ==="
+	sudo tc qdisc show dev veth0 2>/dev/null || echo "No tc rules on veth0"
+	sudo ip netns exec testns ip addr show 2>/dev/null || echo "No testns namespace"
+	ip addr show veth0 2>/dev/null || echo "No veth0 interface"
+
+# Spawn terminal in namespace
+spawn-namespace-terminal:
+	echo "Spawning terminal in test namespace..."
+	echo "You are now in the network namespace. Run 'exit' to return."
+	echo "Your IP in namespace: 192.168.100.2"
+	sudo ip netns exec testns bash
+
+# Check required tools
+check-tools:
+	@echo "Checking required tools for network testing..."
+	@command -v ip >/dev/null 2>&1 || { echo "❌ ip command not found (install iproute2)"; exit 1; }
+	@command -v tc >/dev/null 2>&1 || { echo "❌ tc command not found (install iproute2)"; exit 1; }
+	@command -v ping >/dev/null 2>&1 || { echo "❌ ping command not found"; exit 1; }
+	@command -v sudo >/dev/null 2>&1 || { echo "❌ sudo not found"; exit 1; }
+	@lsmod | grep -q sch_netem || { echo "⚠️  sch_netem module not loaded (will try to load automatically)"; }
+	@echo "✅ All required tools available"
+
+# Help target
+help-network-testing:
+	@echo "Network Testing Makefile Targets:"
+	@echo ""
+	@echo "Setup:"
+	@echo "  setup-test-network          - Create network namespace and veth pair"
+	@echo "  cleanup-test-network        - Remove test network setup"
+	@echo ""
+	@echo "Run Applications:"
+	@echo "  run-delivery-drone-with-args ARGS='--flag=value'"
+	@echo "  run-delivery-drone-in-namespace ARGS='--bind=192.168.100.2'"
+	@echo ""
+	@echo "Network Conditions:"
+	@echo "  apply-poor-network          - 200ms delay, 3% loss, 500kbps"
+	@echo "  apply-mobile-network        - 80±20ms delay, 1% loss, 2Mbps"
+	@echo "  apply-good-network          - 50ms delay, 0.5% loss, 10Mbps"
+	@echo "  apply-bandwidth-limit RATE=1mbit"
+	@echo ""
+	@echo "Complete Test Scenarios:"
+	@echo "  test-scenario-bandwidth-degradation"
+	@echo "  test-scenario-packet-loss"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  show-network-status         - Show current network state"
+	@echo "  test-connection            - Test ping across namespace"
+	@echo ""
+	@echo "Example Usage:"
+	@echo "  make setup-test-network"
+	@echo "  make apply-mobile-network"
+	@echo "  # Terminal 1:"
+	@echo "  make run-delivery-drone-in-namespace ARGS='--bind=192.168.100.2'"
+	@echo "  # Terminal 2:"
+	@echo "  make run-delivery-gcs-with-args ARGS='--connect=192.168.100.2'"

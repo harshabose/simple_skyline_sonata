@@ -10,7 +10,6 @@ import (
 
 	"github.com/harshabose/simple_webrtc_comm/client/pkg"
 	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
-	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
 	"github.com/harshabose/simple_webrtc_comm/mediasource/pkg"
 	"github.com/harshabose/simple_webrtc_comm/transcode/pkg"
 )
@@ -51,12 +50,12 @@ func main() {
 				panic(err)
 			}
 
-			if _, err := pc.CreateDataChannel("MAVLINK",
-				data.WithRandomBindPort,
-				// data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
-			); err != nil {
-				panic(err)
-			}
+			// if _, err := pc.CreateDataChannel("MAVLINK",
+			// 	data.WithRandomBindPort,
+			// 	// data.WithMAVP2P(os.Getenv("MAVP2P_EXE_PATH"), os.Getenv("MAVLINK_SERIAL")),
+			// ); err != nil {
+			// 	panic(err)
+			// }
 
 			if _, err := pc.CreateMediaSource("A8-MINI", true,
 				mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31),
@@ -65,8 +64,8 @@ func main() {
 					mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
 					mediasource.WithTranscoder(
 						transcode.WithGeneralDemuxer(ctx,
-							"0",
-							transcode.WithAvFoundationInputFormatOption,
+							"/dev/video0",
+							// transcode.WithAvFoundationInputFormatOption,
 							transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)),
 						),
 						transcode.WithGeneralDecoder(ctx,
