@@ -26,8 +26,6 @@ func main() {
 			gcs, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				// client.WithVP8MediaEngine(delivery.DefaultVideoClockRate),
-				// client.WithDefaultMediaEngine(),
 				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),

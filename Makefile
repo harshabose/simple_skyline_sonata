@@ -95,22 +95,18 @@ create-env-file:
 	@echo "Creating environment files..."
 	@# Create runtime environment file
 	@echo "# Runtime Environment Variables" > runtime.env
-	@echo "$(HARDWARE_ENV)" | tr ' ' '\n' >> runtime.env
+	@echo "$(HARDWARE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
 	@echo "" >> runtime.env
 	@echo "# Firebase Configuration" >> runtime.env
-	@echo "$(FIREBASE_ENV)" | tr ' ' '\n' >> runtime.env
+	@echo "$(FIREBASE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
 	@echo "" >> runtime.env
 	@echo "# Network Configuration" >> runtime.env
-	@echo "$(NETWORK_ENV)" | tr ' ' '\n' >> runtime.env
+	@echo "$(NETWORK_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
 	@echo "Runtime environment file created at runtime.env"
 	@# Create compilation environment file
 	@echo "# Compilation Environment Variables" > compile.env
-	@echo "$(COMPILE_ENV)" | tr ' ' '\n' >> compile.env
+	@echo "$(COMPILE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> compile.env
 	@echo "Compilation environment file created at compile.env"
-	@# Create complete environment file
-	@echo "# Complete Environment Variables" > complete.env
-	@echo "$(RUNTIME_ENV)" | tr ' ' '\n' >> complete.env
-	@echo "Complete environment file created at complete.env"
 
 
 

@@ -9,11 +9,10 @@ import (
 	"github.com/pion/webrtc/v4"
 
 	"github.com/harshabose/simple_webrtc_comm/client/pkg"
+	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 	"github.com/harshabose/simple_webrtc_comm/datachannel/pkg"
 	"github.com/harshabose/simple_webrtc_comm/mediasource/pkg"
 	"github.com/harshabose/simple_webrtc_comm/transcode/pkg"
-
-	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 )
 
 func main() {
@@ -29,9 +28,7 @@ func main() {
 			drone, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry,
 				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
-				// client.WithDefaultMediaEngine(),
-				// client.WithVP8MediaEngine(delivery.DefaultVideoClockRate),
-				client.WithBandwidthControlInterceptor(300_000, time.Second),
+				client.WithBandwidthControlInterceptor(delivery.InitialBitrate, delivery.MinimumBitrate, delivery.MaximumBitrate, time.Second),
 				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
@@ -63,29 +60,35 @@ func main() {
 
 			if _, err := pc.CreateMediaSource("A8-MINI", true,
 				mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31),
-				// mediasource.WithVP8Track(delivery.DefaultVideoClockRate),
 				mediasource.WithPriority(mediasource.Level5),
 				mediasource.WithStream(
 					mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
-					mediasource.WithDemuxer(
-						"0",
-						transcode.WithAvFoundationInputFormatOption,
-						// "rtsp://192.168.144.25:8554/main.264",
-						// transcode.WithRTSPInputOption,
-						transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)*3),
-					),
-					mediasource.WithDecoder(transcode.WithDecoderBufferSize(int(delivery.DefaultVideoFPS)*3)),
-					mediasource.WithFilter(
-						transcode.VideoFilters,
-						transcode.WithFilterBufferSize(int(delivery.DefaultVideoFPS)*3),
-						transcode.WithVideoScaleFilterContent(delivery.DefaultVideoWidth, delivery.DefaultVideoHeight),
-						transcode.WithVideoPixelFormatFilterContent(delivery.DefaultPixelFormat),
-						transcode.WithVideoFPSFilterContent(delivery.DefaultVideoFPS),
-					),
-					mediasource.WithEncoder(
-						astiav.CodecIDH264,
-						transcode.WithEncoderBufferSize(int(delivery.DefaultVideoFPS)*3),
-						transcode.WithWebRTCOptimisedOptions,
+					mediasource.WithTranscoder(
+						transcode.WithGeneralDemuxer(ctx,
+							"0",
+							transcode.WithAvFoundationInputFormatOption,
+							transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)),
+						),
+						transcode.WithGeneralDecoder(ctx,
+							transcode.WithDecoderBufferSize(int(delivery.DefaultVideoFPS)),
+						),
+						transcode.WithGeneralFilter(ctx,
+							transcode.VideoFilters,
+							transcode.WithFilterBufferSize(int(delivery.DefaultVideoFPS)),
+							transcode.WithVideoScaleFilterContent(delivery.DefaultVideoWidth, delivery.DefaultVideoHeight),
+							transcode.WithVideoPixelFormatFilterContent(delivery.DefaultPixelFormat),
+							transcode.WithVideoFPSFilterContent(delivery.DefaultVideoFPS),
+						),
+						transcode.WithBitrateControlEncoder(ctx,
+							astiav.CodecIDH264,
+							transcode.UpdateConfig{
+								MinBitrate:              delivery.MinimumBitrate,              // 500kbps
+								MaxBitrate:              delivery.MaximumBitrate,              // 2Mbps
+								CutVideoBelowMinBitrate: delivery.CutVideoBelowMinimumBitrate, // Enable pausing
+							},
+							transcode.LowLatencyBitrateControlled,
+							int(delivery.DefaultVideoFPS),
+						),
 					),
 				),
 			); err != nil {
@@ -99,5 +102,4 @@ func main() {
 			drone.WaitUntilClosed()
 		}()
 	}
-
 }

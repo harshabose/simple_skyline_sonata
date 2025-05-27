@@ -130,12 +130,12 @@ const (
 // 		// }
 // 	}()
 //
-// 	// Set the handler for ICE connection state
+// 	// SetInputOption the handler for ICE connection state
 // 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 // 		fmt.Printf("🔗 ICE Connection State: %s\n", connectionState.String())
 // 	})
 //
-// 	// Set the handler for Peer connection state
+// 	// SetInputOption the handler for Peer connection state
 // 	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 // 		fmt.Printf("📡 Peer Connection State: %s\n", state.String())
 // 	})
