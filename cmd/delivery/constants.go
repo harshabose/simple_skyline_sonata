@@ -16,8 +16,8 @@ const (
 )
 
 const (
-	InitialBitrate              int64 = 800_000
+	InitialBitrate              int64 = 500_000
 	MinimumBitrate              int64 = 100_000
-	MaximumBitrate              int64 = 2_000_000
+	MaximumBitrate              int64 = 800_000
 	CutVideoBelowMinimumBitrate       = false
 )
