@@ -64,8 +64,8 @@ func main() {
 					mediasource.WithBufferSize(int(delivery.DefaultVideoFPS*3)),
 					mediasource.WithTranscoder(
 						transcode.WithGeneralDemuxer(ctx,
-							"/dev/video0",
-							// transcode.WithAvFoundationInputFormatOption,
+							"0",
+							transcode.WithAvFoundationInputFormatOption,
 							transcode.WithDemuxerBufferSize(int(delivery.DefaultVideoFPS)),
 						),
 						transcode.WithGeneralDecoder(ctx,
@@ -78,13 +78,9 @@ func main() {
 							transcode.WithVideoPixelFormatFilterContent(delivery.DefaultPixelFormat),
 							transcode.WithVideoFPSFilterContent(delivery.DefaultVideoFPS),
 						),
-						transcode.WithBitrateControlEncoder(ctx,
+						transcode.WithMultiEncoderBitrateControl(ctx,
 							astiav.CodecIDH264,
-							transcode.UpdateConfig{
-								MinBitrate:              delivery.MinimumBitrate,              // 500kbps
-								MaxBitrate:              delivery.MaximumBitrate,              // 2Mbps
-								CutVideoBelowMinBitrate: delivery.CutVideoBelowMinimumBitrate, // Enable pausing
-							},
+							transcode.NewMultiConfig(delivery.MinimumBitrate, delivery.MaximumBitrate, 10),
 							transcode.LowLatencyBitrateControlled,
 							int(delivery.DefaultVideoFPS),
 						),
