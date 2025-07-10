@@ -7,12 +7,23 @@ else
     NULL_DEV := /dev/null
 endif
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# COMMAND LINE ARGUMENTS
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+# Default value for cgo_enabled
+CGO_ENABLED ?= false
+
+# Validate CGO_ENABLED argument
+ifneq ($(CGO_ENABLED),true)
+ifneq ($(CGO_ENABLED),false)
+$(error CGO_ENABLED must be either 'true' or 'false'. Usage: make target CGO_ENABLED=true)
+endif
+endif
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR-VAR
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 # GENERAL VARIABLES
 SHELL := /bin/bash
@@ -48,22 +59,27 @@ OPUS_SRC_DIR := $(OPUS_DIRECTORY)/src
 # VARIABLES FOR MAVP2P
 MAVP2P_INSTALL_DIR := $(THIRD_PARTY_DIR)/mavp2p
 
-
-
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV-ENV
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
-
+# COMPILE ENVIRONMENT (only when CGO is enabled)
+ifeq ($(CGO_ENABLED),true)
 COMPILE_ENV := CGO_LDFLAGS="-L$(FFMPEG_DIRECTORY)/lib -L$(X264_DIRECTORY)/lib -L$(VPX_DIRECTORY)/lib" \
                CGO_CFLAGS="-I$(FFMPEG_DIRECTORY)/include -I$(X264_DIRECTORY)/include -I$(VPX_DIRECTORY)/include" \
                PKG_CONFIG_PATH="$(FFMPEG_DIRECTORY)/lib/pkgconfig:$(X264_DIRECTORY)/lib/pkgconfig:$(VPX_DIRECTORY)/lib/pkgconfig" \
                LD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib:$(VPX_DIRECTORY)/lib:$$LD_LIBRARY_PATH"
 
-RUNTIME_ENV_MACOS := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV) \
-                     DYLD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib:$(VPX_DIRECTORY)/lib"
+ifeq ($(DETECTED_OS),Darwin)
+	CGO_RUNTIME_ENV_MACOS := DYLD_LIBRARY_PATH="$(FFMPEG_DIRECTORY)/lib:$(X264_DIRECTORY)/lib:$(VPX_DIRECTORY)/lib"
+endif
 
+else
+COMPILE_ENV :=
+CGO_RUNTIME_ENV_MACOS :=
+endif
+
+# BASE ENVIRONMENT VARIABLES
 FIREBASE_ENV := FIREBASE_TYPE=service_account \
                 FIREBASE_PROJECT_ID=iitb-rgstc-signalling-server \
                 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-s07hu@iitb-rgstc-signalling-server.iam.gserviceaccount.com \
@@ -86,13 +102,17 @@ NETWORK_ENV := STUN_SERVER_URL=stun:stun.skyline-sonata.in:3478 \
 HARDWARE_ENV := MAVP2P_EXE_PATH=$(MAVP2P_INSTALL_DIR)/mavp2p \
                 MAVLINK_SERIAL=/dev/ttyTHS0:115200
 
-RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV) $(RUNTIME_ENV_MACOS)
+# Runtime environments
+CGO_RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV) $(COMPILE_ENV) $(CGO_RUNTIME_ENV_MACOS)
+RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV)
 
-WINDOWS_RUNTIME_ENV := $(HARDWARE_ENV) $(FIREBASE_ENV) $(NETWORK_ENV)
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ENVIRONMENT FILE CREATION
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 create-env-file:
-	@echo "Creating environment files..."
+	@echo "Creating environment files (without CGO compilation flags)..."
 	@# Create runtime environment file
 	@echo "# Runtime Environment Variables" > runtime.env
 	@echo "$(HARDWARE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
@@ -102,29 +122,100 @@ create-env-file:
 	@echo "" >> runtime.env
 	@echo "# Network Configuration" >> runtime.env
 	@echo "$(NETWORK_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
-	@echo "Runtime environment file created at runtime.env"
+	@echo "Runtime environment file created at runtime.env (without CGO compilation flags)"
+
+create-env-file-with-cgo-enabled:
+ifeq ($(CGO_ENABLED),false)
+	@echo "ERROR: CGO_ENABLED must be set to 'true' to create environment file with CGO flags"
+	@echo "Usage: make create-env-file-with-cgo-enabled CGO_ENABLED=true"
+	@exit 1
+endif
+	@echo "Creating environment files with CGO compilation flags..."
+	@# Create runtime environment file
+	@echo "# Runtime Environment Variables" > runtime.env
+	@echo "$(HARDWARE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
+	@echo "" >> runtime.env
+	@echo "# Firebase Configuration" >> runtime.env
+	@echo "$(FIREBASE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
+	@echo "" >> runtime.env
+	@echo "# Network Configuration" >> runtime.env
+	@echo "$(NETWORK_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
+	@echo "" >> runtime.env
+	@echo "# CGO Compilation Environment" >> runtime.env
+	@echo "$(COMPILE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> runtime.env
+	@echo "Runtime environment file created at runtime.env (with CGO compilation flags)"
 	@# Create compilation environment file
 	@echo "# Compilation Environment Variables" > compile.env
 	@echo "$(COMPILE_ENV)" | sed 's/ \([A-Z_]*=\)/;\1/g' >> compile.env
 	@echo "Compilation environment file created at compile.env"
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# CGO DEPENDENCY VALIDATION
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+debug-os:
+	@echo "Detected OS: $(DETECTED_OS)"
+	@echo "CGO Enabled: $(CGO_ENABLED)"
+ifeq ($(DETECTED_OS),Darwin)
+	@echo "Darwin-specific paths will be set"
+else
+	@echo "Non-Darwin paths will be set"
+endif
 
+check-cgo-enabled:
+ifeq ($(CGO_ENABLED),false)
+	@echo "ERROR: This target requires CGO_ENABLED=true"
+	@echo "Usage: make $@ CGO_ENABLED=true"
+	@exit 1
+endif
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET-TARGET
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+.PHONY: check help
 
-.PHONY: check
+help:
+	@echo "Available targets:"
+	@echo ""
+	@echo "Basic targets:"
+	@echo "  check                           - Check if required tools are installed"
+	@echo "  create-env-file                 - Create environment files without CGO flags"
+	@echo "  create-env-file-with-cgo-enabled - Create environment files with CGO flags (requires CGO_ENABLED=true)"
+	@echo ""
+	@echo "CGO-dependent targets (require CGO_ENABLED=true):"
+	@echo "  install-third-party             - Install FFmpeg and related dependencies"
+	@echo "  install-libx264                 - Install libx264"
+	@echo "  install-libvpx-darwin           - Install libvpx for macOS"
+	@echo "  install-libopus                 - Install libopus"
+	@echo "  install-ffmpeg-linux            - Install FFmpeg for Linux"
+	@echo "  install-ffmpeg-darwin           - Install FFmpeg for macOS"
+	@echo "  install-ffmpeg-docker           - Install FFmpeg for Docker"
+	@echo "  build-delivery-drone            - Build delivery drone (requires CGO)"
+	@echo "  run-delivery-drone              - Run delivery drone (requires CGO)"
+	@echo ""
+	@echo "Non-CGO targets:"
+	@echo "  install-windows-deps            - Install Windows dependencies"
+	@echo "  install-mavp2p                  - Install mavp2p"
+	@echo "  build-delivery-gcs              - Build delivery GCS"
+	@echo "  run-delivery-gcs                - Run delivery GCS"
+	@echo ""
+	@echo "Usage with CGO:"
+	@echo "  make install-third-party CGO_ENABLED=true"
+	@echo "  make build-delivery-drone CGO_ENABLED=true"
+	@echo ""
+	@echo "Usage without CGO:"
+	@echo "  make build-delivery-gcs"
+	@echo "  make install-mavp2p"
 
 check:
 	git --version >$(NULL_DEV) 2>&1 || (echo "git is not installed or not in PATH"; exit 1)
 	go version >$(NULL_DEV) 2>&1 || (echo "go is not installed or not in PATH"; exit 1)
 
-install-third-party: install-ffmpeg-linux install-mavp2p
+# CGO-dependent installation targets
+install-third-party: check-cgo-enabled install-ffmpeg-linux install-mavp2p
 
-install-libx264:
+install-libx264: check-cgo-enabled
 	mkdir -p $(X264_SRC_DIR)
 	cd $(X264_SRC_DIR) && git clone https://code.videolan.org/videolan/x264.git .
 	cd $(X264_SRC_DIR) && git checkout stable
@@ -135,7 +226,7 @@ install-libx264:
 	cd $(X264_SRC_DIR) && make -j$(nproc)
 	cd $(X264_SRC_DIR) && make install
 
-install-libvpx-darwin:
+install-libvpx-darwin: check-cgo-enabled
 	echo "Installing libvpx for macOS ARM64..."
 	mkdir -p $(VPX_DIRECTORY)
 	mkdir -p $(VPX_SRC_DIR)
@@ -175,8 +266,7 @@ install-libvpx-darwin:
 	fi
 	echo "libvpx installation complete."
 
-
-install-libopus:
+install-libopus: check-cgo-enabled
 	mkdir -p $(OPUS_SRC_DIR)
 	cd $(OPUS_SRC_DIR) && git clone https://github.com/xiph/opus.git .
 	cd $(OPUS_SRC_DIR) && ./autogen.sh
@@ -189,6 +279,7 @@ install-libopus:
 	cd $(OPUS_SRC_DIR) && make -j$(nproc)
 	cd $(OPUS_SRC_DIR) && make install
 
+# Non-CGO installation targets
 install-windows-deps:
 	if [ "$(DETECTED_OS)" = "Windows" ]; then \
 		echo "Installing Windows dependencies..."; \
@@ -196,7 +287,7 @@ install-windows-deps:
 		pacman -S --noconfirm --needed git diffutils mingw-w64-x86_64-toolchain pkg-config make yasm; \
 	fi
 
-install-ffmpeg-linux:
+install-ffmpeg-linux: check-cgo-enabled
 	echo "Installing FFmpeg $(FFMPEG_VERSION) from source..."
 	mkdir -p $(FFMPEG_DIRECTORY)
 	mkdir -p $(FFMPEG_SRC_DIR)
@@ -224,7 +315,7 @@ install-ffmpeg-linux:
 		exit 1; \
 	fi
 
-install-ffmpeg-darwin:
+install-ffmpeg-darwin: check-cgo-enabled
 	echo "Installing FFmpeg $(FFMPEG_VERSION) from source..."
 	mkdir -p $(FFMPEG_DIRECTORY)
 	mkdir -p $(FFMPEG_SRC_DIR)
@@ -254,7 +345,7 @@ install-ffmpeg-darwin:
 		exit 1; \
 	fi
 
-install-ffmpeg-docker:
+install-ffmpeg-docker: check-cgo-enabled
 	echo "Installing FFmpeg $(FFMPEG_VERSION) from source..."
 	mkdir -p $(FFMPEG_DIRECTORY)
 	mkdir -p $(FFMPEG_SRC_DIR)
@@ -283,217 +374,34 @@ install-mavp2p:
 	cd $(MAVP2P_INSTALL_DIR) && CGO_ENABLED=0 go build .
 	echo "mavp2p installation complete."
 
-
-
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD-BUILD
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
-build-delivery-drone: check
-	echo "Building delivery drone binary..."
+# CGO-dependent build targets
+build-delivery-drone: check check-cgo-enabled
+	echo "Building delivery drone binary with CGO support..."
 	rm -rf $(BUILD_DIR)/delivery/drone
 	mkdir -p $(BUILD_DIR)/delivery/drone
 	cd $(CMD_DIR)/delivery/drone && \
-	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/delivery/drone/skyline_sonata.delivery.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	$(CGO_RUNTIME_ENV) go build -tags cgo_enabled -o $(BUILD_DIR)/delivery/drone/skyline_sonata.delivery.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
 	echo "delivery drone binary built successfully at $(BUILD_DIR)/delivery/drone"
 
+run-delivery-drone: check-cgo-enabled
+	echo "Running delivery drone with CGO support..."
+	cd $(BUILD_DIR)/delivery/drone && \
+	$(CGO_RUNTIME_ENV) ./skyline_sonata.delivery.drone
+
+# Non-CGO build targets
 build-delivery-gcs: check
-	echo "Building delivery gcs binary..."
+	echo "Building delivery gcs binary without CGO..."
 	rm -rf $(BUILD_DIR)/delivery/gcs
 	mkdir -p $(BUILD_DIR)/delivery/gcs
 	cd $(CMD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "delivery gcs binary built successfully at $(BUILD_DIR)/delivery/$(BINARY_GROUND_STATION)"
-
-run-delivery-drone:
-	echo "Running delivery drone..."
-	cd $(BUILD_DIR)/delivery/drone && \
-	$(RUNTIME_ENV) ./skyline_sonata.delivery.drone
+	$(RUNTIME_ENV) CGO_ENABLED=0 go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "delivery gcs binary built successfully at $(BUILD_DIR)/delivery/gcs"
 
 run-delivery-gcs:
-	echo "Running delivery gcs..."
+	echo "Running delivery gcs without CGO..."
 	cd $(BUILD_DIR)/delivery/gcs && \
 	$(RUNTIME_ENV) ./skyline_sonata.delivery.gcs
-
-build-audio-drone: check
-	echo "Building audio drone binary..."
-	rm -rf $(BUILD_DIR)/audio/drone
-	mkdir -p $(BUILD_DIR)/audio/drone
-	cd $(CMD_DIR)/audio/drone && \
-	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/drone/skyline_sonata.audio.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "audio drone binary built successfully at $(BUILD_DIR)/audio/drone"
-
-build-audio-gcs: check
-	echo "Building audio gcs binary..."
-	rm -rf $(BUILD_DIR)/audio/gcs
-	mkdir -p $(BUILD_DIR)/audio/gcs
-	cd $(CMD_DIR)/audio/gcs && \
-	$(RUNTIME_ENV) go build -o $(BUILD_DIR)/audio/gcs/skyline_sonata.audio.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "audio gcs binary built successfully at $(BUILD_DIR)/audio/$(BINARY_GROUND_STATION)"
-
-build-audio-gcs-windows-amd64: check
-	echo "Building audio gcs binary..."
-	rm -rf $(BUILD_DIR)/delivery/gcs
-	mkdir -p $(BUILD_DIR)/delivery/gcs
-	cd $(CMD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.windows.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "audio gcs binary built successfully at $(BUILD_DIR)/delivery/$(BINARY_GROUND_STATION)"
-
-run-audio-drone:
-	echo "Running audio drone..."
-	cd $(BUILD_DIR)/audio/drone && \
-	$(RUNTIME_ENV) ./skyline_sonata.audio.drone
-
-run-audio-gcs:
-	echo "Running audio gcs..."
-	cd $(BUILD_DIR)/audio/gcs && \
-	$(RUNTIME_ENV) ./skyline_sonata.audio.gcs
-
-# Network namespace testing targets
-run-delivery-drone-with-args:
-	echo "Running delivery drone with arguments: $(ARGS)"
-	cd $(BUILD_DIR)/delivery/drone && \
-	$(RUNTIME_ENV) ./skyline_sonata.delivery.drone $(ARGS)
-
-run-delivery-gcs-with-args:
-	echo "Running delivery gcs with arguments: $(ARGS)"
-	cd $(BUILD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) ./skyline_sonata.delivery.gcs $(ARGS)
-
-# Network namespace setup
-setup-test-network:
-	echo "Setting up test network namespace..."
-	# Clean up any existing setup first
-	sudo tc qdisc del dev veth0 root 2>/dev/null || true
-	sudo ip link del veth0 2>/dev/null || true
-	sudo ip netns del testns 2>/dev/null || true
-	# Create fresh setup
-	sudo ip netns add testns
-	sudo ip link add veth0 type veth peer name veth1
-	sudo ip link set veth1 netns testns
-	sudo ip addr add 192.168.100.1/24 dev veth0 || true
-	sudo ip link set veth0 up
-	sudo ip netns exec testns ip addr add 192.168.100.2/24 dev veth1 || true
-	sudo ip netns exec testns ip link set veth1 up
-	sudo ip netns exec testns ip link set lo up
-	echo "Test network ready: Main(192.168.100.1) ↔ Namespace(192.168.100.2)"
-	echo "Testing connectivity..."
-	ping -c 2 192.168.100.2
-
-# Apply network conditions
-apply-network-conditions:
-	echo "Applying network conditions: $(CONDITIONS)"
-	sudo tc qdisc del dev veth0 root 2>/dev/null || true
-	sudo tc qdisc add dev veth0 root $(CONDITIONS)
-	echo "Applied: $(CONDITIONS)"
-
-# Predefined network conditions
-apply-poor-network:
-	$(MAKE) apply-network-conditions CONDITIONS="netem delay 200ms loss 3% rate 500kbit"
-
-apply-mobile-network:
-	$(MAKE) apply-network-conditions CONDITIONS="netem delay 80ms 20ms loss 1% rate 2mbit"
-
-apply-good-network:
-	$(MAKE) apply-network-conditions CONDITIONS="netem delay 50ms loss 0.5% rate 10mbit"
-
-apply-bandwidth-limit:
-	$(MAKE) apply-network-conditions CONDITIONS="tbf rate $(RATE) burst 32kbit latency 400ms"
-
-# Run in namespace (server side)
-run-delivery-drone-in-namespace:
-	echo "Running delivery drone in test namespace (server)..."
-	sudo ip netns exec testns bash -c "cd $(BUILD_DIR)/delivery/drone && $(RUNTIME_ENV) ./skyline_sonata.delivery.drone $(ARGS)"
-
-run-delivery-gcs-in-namespace:
-	echo "Running delivery gcs in test namespace (server)..."
-	sudo ip netns exec testns bash -c "cd $(BUILD_DIR)/delivery/gcs && $(RUNTIME_ENV) ./skyline_sonata.delivery.gcs $(ARGS)"
-
-# Complete test scenarios
-test-scenario-bandwidth-degradation:
-	echo "=== Testing Bandwidth Degradation Scenario ==="
-	$(MAKE) apply-good-network
-	echo "Phase 1: Good network (10Mbps) - Run your apps now, press Enter when ready for next phase"
-	read
-	$(MAKE) apply-mobile-network
-	echo "Phase 2: Mobile network (2Mbps) - Press Enter for next phase"
-	read
-	$(MAKE) apply-poor-network
-	echo "Phase 3: Poor network (500kbps) - Press Enter to finish"
-	read
-
-test-scenario-packet-loss:
-	echo "=== Testing Packet Loss Scenario ==="
-	$(MAKE) apply-network-conditions CONDITIONS="netem rate 1mbit loss 1%"
-	echo "Phase 1: 1% packet loss - Press Enter for next phase"
-	read
-	$(MAKE) apply-network-conditions CONDITIONS="netem rate 1mbit loss 5%"
-	echo "Phase 2: 5% packet loss - Press Enter to finish"
-	read
-
-# Cleanup
-cleanup-test-network:
-	echo "Cleaning up test network..."
-	sudo tc qdisc del dev veth0 root 2>/dev/null || true
-	sudo ip link del veth0 2>/dev/null || true
-	sudo ip netns del testns 2>/dev/null || true
-	echo "Test network cleaned up"
-
-# Helper targets
-show-network-status:
-	echo "=== Network Status ==="
-	sudo tc qdisc show dev veth0 2>/dev/null || echo "No tc rules on veth0"
-	sudo ip netns exec testns ip addr show 2>/dev/null || echo "No testns namespace"
-	ip addr show veth0 2>/dev/null || echo "No veth0 interface"
-
-# Spawn terminal in namespace
-spawn-namespace-terminal:
-	echo "Spawning terminal in test namespace..."
-	echo "You are now in the network namespace. Run 'exit' to return."
-	echo "Your IP in namespace: 192.168.100.2"
-	sudo ip netns exec testns bash
-
-# Check required tools
-check-tools:
-	@echo "Checking required tools for network testing..."
-	@command -v ip >/dev/null 2>&1 || { echo "❌ ip command not found (install iproute2)"; exit 1; }
-	@command -v tc >/dev/null 2>&1 || { echo "❌ tc command not found (install iproute2)"; exit 1; }
-	@command -v ping >/dev/null 2>&1 || { echo "❌ ping command not found"; exit 1; }
-	@command -v sudo >/dev/null 2>&1 || { echo "❌ sudo not found"; exit 1; }
-	@lsmod | grep -q sch_netem || { echo "⚠️  sch_netem module not loaded (will try to load automatically)"; }
-	@echo "✅ All required tools available"
-
-# Help target
-help-network-testing:
-	@echo "Network Testing Makefile Targets:"
-	@echo ""
-	@echo "Setup:"
-	@echo "  setup-test-network          - Create network namespace and veth pair"
-	@echo "  cleanup-test-network        - Remove test network setup"
-	@echo ""
-	@echo "Run Applications:"
-	@echo "  run-delivery-drone-with-args ARGS='--flag=value'"
-	@echo "  run-delivery-drone-in-namespace ARGS='--bind=192.168.100.2'"
-	@echo ""
-	@echo "Network Conditions:"
-	@echo "  apply-poor-network          - 200ms delay, 3% loss, 500kbps"
-	@echo "  apply-mobile-network        - 80±20ms delay, 1% loss, 2Mbps"
-	@echo "  apply-good-network          - 50ms delay, 0.5% loss, 10Mbps"
-	@echo "  apply-bandwidth-limit RATE=1mbit"
-	@echo ""
-	@echo "Complete Test Scenarios:"
-	@echo "  test-scenario-bandwidth-degradation"
-	@echo "  test-scenario-packet-loss"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  show-network-status         - Show current network state"
-	@echo "  test-connection            - Test ping across namespace"
-	@echo ""
-	@echo "Example Usage:"
-	@echo "  make setup-test-network"
-	@echo "  make apply-mobile-network"
-	@echo "  # Terminal 1:"
-	@echo "  make run-delivery-drone-in-namespace ARGS='--bind=192.168.100.2'"
-	@echo "  # Terminal 2:"
-	@echo "  make run-delivery-gcs-with-args ARGS='--connect=192.168.100.2'"
