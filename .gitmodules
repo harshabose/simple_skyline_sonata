@@ -4,3 +4,6 @@
 [submodule "dependencies/tools/buffer"]
 	path = dependencies/tools/buffer
 	url = https://github.com/harshabose/buffer.git
+[submodule "dependencies/mediapipe"]
+	path = dependencies/mediapipe
+	url = https://github.com/harshabose/mediapipe.git
