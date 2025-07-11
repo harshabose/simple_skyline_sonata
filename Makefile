@@ -191,21 +191,21 @@ help:
 	@echo "  install-ffmpeg-linux            - Install FFmpeg for Linux"
 	@echo "  install-ffmpeg-darwin           - Install FFmpeg for macOS"
 	@echo "  install-ffmpeg-docker           - Install FFmpeg for Docker"
-	@echo "  build-delivery-drone            - Build delivery drone (requires CGO)"
-	@echo "  run-delivery-drone              - Run delivery drone (requires CGO)"
+	@echo "  build-fpv-drone            - Build fpv drone (requires CGO)"
+	@echo "  run-fpv-drone              - Run fpv drone (requires CGO)"
 	@echo ""
 	@echo "Non-CGO targets:"
 	@echo "  install-windows-deps            - Install Windows dependencies"
 	@echo "  install-mavp2p                  - Install mavp2p"
-	@echo "  build-delivery-gcs              - Build delivery GCS"
-	@echo "  run-delivery-gcs                - Run delivery GCS"
+	@echo "  build-fpv-gcs              - Build fpv GCS"
+	@echo "  run-fpv-gcs                - Run fpv GCS"
 	@echo ""
 	@echo "Usage with CGO:"
 	@echo "  make install-third-party CGO_ENABLED=true"
-	@echo "  make build-delivery-drone CGO_ENABLED=true"
+	@echo "  make build-fpv-drone CGO_ENABLED=true"
 	@echo ""
 	@echo "Usage without CGO:"
-	@echo "  make build-delivery-gcs"
+	@echo "  make build-fpv-gcs"
 	@echo "  make install-mavp2p"
 
 check:
@@ -379,29 +379,29 @@ install-mavp2p:
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # CGO-dependent build targets
-build-delivery-drone: check check-cgo-enabled
-	echo "Building delivery drone binary with CGO support..."
-	rm -rf $(BUILD_DIR)/delivery/drone
-	mkdir -p $(BUILD_DIR)/delivery/drone
-	cd $(CMD_DIR)/delivery/drone && \
-	$(CGO_RUNTIME_ENV) go build -tags cgo_enabled -o $(BUILD_DIR)/delivery/drone/skyline_sonata.delivery.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "delivery drone binary built successfully at $(BUILD_DIR)/delivery/drone"
+build-fpv-drone: check check-cgo-enabled
+	echo "Building fpv drone binary with CGO support..."
+	rm -rf $(BUILD_DIR)/fpv/drone
+	mkdir -p $(BUILD_DIR)/fpv/drone
+	cd $(CMD_DIR)/fpv/drone && \
+	$(CGO_RUNTIME_ENV) go build -tags cgo_enabled -o $(BUILD_DIR)/fpv/drone/skyline_sonata.fpv.drone $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "fpv drone binary built successfully at $(BUILD_DIR)/fpv/drone"
 
-run-delivery-drone: check-cgo-enabled
-	echo "Running delivery drone with CGO support..."
-	cd $(BUILD_DIR)/delivery/drone && \
-	$(CGO_RUNTIME_ENV) ./skyline_sonata.delivery.drone
+run-fpv-drone: check-cgo-enabled
+	echo "Running fpv drone with CGO support..."
+	cd $(BUILD_DIR)/fpv/drone && \
+	$(CGO_RUNTIME_ENV) ./skyline_sonata.fpv.drone
 
 # Non-CGO build targets
-build-delivery-gcs: check
-	echo "Building delivery gcs binary without CGO..."
-	rm -rf $(BUILD_DIR)/delivery/gcs
-	mkdir -p $(BUILD_DIR)/delivery/gcs
-	cd $(CMD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) CGO_ENABLED=0 go build -o $(BUILD_DIR)/delivery/gcs/skyline_sonata.delivery.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
-	echo "delivery gcs binary built successfully at $(BUILD_DIR)/delivery/gcs"
+build-fpv-gcs: check
+	echo "Building fpv gcs binary without CGO..."
+	rm -rf $(BUILD_DIR)/fpv/gcs
+	mkdir -p $(BUILD_DIR)/fpv/gcs
+	cd $(CMD_DIR)/fpv/gcs && \
+	$(RUNTIME_ENV) CGO_ENABLED=0 go build -o $(BUILD_DIR)/fpv/gcs/skyline_sonata.fpv.gcs $(LDFLAGS) . || (echo "Build failed"; exit 1)
+	echo "fpv gcs binary built successfully at $(BUILD_DIR)/fpv/gcs"
 
-run-delivery-gcs:
-	echo "Running delivery gcs without CGO..."
-	cd $(BUILD_DIR)/delivery/gcs && \
-	$(RUNTIME_ENV) ./skyline_sonata.delivery.gcs
+run-fpv-gcs:
+	echo "Running fpv gcs without CGO..."
+	cd $(BUILD_DIR)/fpv/gcs && \
+	$(RUNTIME_ENV) ./skyline_sonata.fpv.gcs
