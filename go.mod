@@ -1,15 +1,13 @@
 module github.com/harshabose/simple_webrtc_comm
 
-go 1.24
-
-toolchain go1.24.1
+go 1.24.1
 
 require (
 	github.com/asticode/go-astiav v0.37.0
 	github.com/coder/websocket v1.8.13
 	github.com/harshabose/mediapipe v0.0.0
 	github.com/harshabose/simple_webrtc_comm/client v0.0.0
-	github.com/harshabose/tools/buffer v0.0.0
+	github.com/harshabose/tools v0.0.0
 	github.com/pion/interceptor v0.1.40
 	github.com/pion/webrtc/v4 v4.1.2
 )
@@ -74,7 +72,7 @@ require (
 )
 
 replace (
-	github.com/harshabose/mediapipe => ../mediapipe
+	github.com/harshabose/mediapipe => ./dependencies/mediapipe
 	github.com/harshabose/simple_webrtc_comm/client => ./dependencies/client
-	github.com/harshabose/tools/buffer => ./dependencies/tools/buffer
+	github.com/harshabose/tools => ./dependencies/tools
 )

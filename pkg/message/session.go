@@ -10,14 +10,14 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/harshabose/simple_webrtc_comm/client/pkg"
+	"github.com/harshabose/simple_webrtc_comm/client"
 	"github.com/harshabose/simple_webrtc_comm/pkg/config"
 )
 
 type Session struct {
 	config         config.Config
 	Conn           *websocket.Conn
-	PeerConnection *client.PeerConnection
+	PeerConnection *client.client
 	mux            sync.RWMutex
 }
 

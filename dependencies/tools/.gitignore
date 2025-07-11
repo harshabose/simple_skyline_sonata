@@ -19,7 +19,6 @@ vendor/
 
 # Build directories
 build/
-build_bak/
 third_party/
 
 # Environment files

@@ -29,7 +29,7 @@ RUN make install-mavp2p
 # Will create complete.env file
 RUN make create-env-file
 
-RUN bash -c 'make build-delivery-gcs'
+RUN bash -c 'make build-fpv-gcs'
 
 # Run main application
 CMD bash -c 'make run-delivery-gcs'

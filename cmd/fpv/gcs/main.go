@@ -5,17 +5,17 @@ import (
 	"math"
 	"time"
 
-	"github.com/harshabose/mediapipe"
-	"github.com/harshabose/mediapipe/pkg/dioreader"
-	"github.com/harshabose/mediapipe/pkg/diowriter"
-	"github.com/harshabose/mediapipe/pkg/loopback"
-	"github.com/harshabose/mediapipe/pkg/rtsp"
+	"github.com/harshabose/services/pkg/rtsp"
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 
-	"github.com/harshabose/simple_webrtc_comm/client/pkg"
+	"github.com/harshabose/mediapipe"
+	"github.com/harshabose/mediapipe/pkg/consumers"
+	"github.com/harshabose/mediapipe/pkg/duplexers"
+	"github.com/harshabose/mediapipe/pkg/generators"
+	"github.com/harshabose/simple_webrtc_comm/client"
 	"github.com/harshabose/simple_webrtc_comm/client/pkg/mediasink"
-	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
+	"github.com/harshabose/simple_webrtc_comm/cmd/fpv"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			l, err := loopback.NewLoopBack(context.Background(), "127.0.0.1:0", loopback.WithLoopBackPort(14550))
+			l, err := duplexers.NewLoopBack(context.Background(), "127.0.0.1:0", duplexers.WithLoopBackPort(14550))
 			if err != nil {
 				panic(err)
 			}
@@ -36,7 +36,7 @@ func main() {
 
 			gcs, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry, settings,
-				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
+				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
 				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
@@ -81,16 +81,16 @@ func main() {
 				panic(err)
 			}
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 
 			rl := mediapipe.NewIdentityAnyReader[[]byte](l)
 			wl := mediapipe.NewIdentityAnyWriter[[]byte](l)
 
-			ird, err := dioreader.NewDataChannel(datachannel.DataChannel(), math.MaxUint16)
+			ird, err := generators.NewIODataChannel(datachannel.DataChannel(), math.MaxUint16)
 			if err != nil {
 				panic(err)
 			}
-			iwd, err := diowriter.NewDataChannel(datachannel.DataChannel(), math.MaxUint16)
+			iwd, err := consumers.NewIODataChannel(datachannel.DataChannel(), math.MaxUint16)
 			if err != nil {
 				panic(err)
 			}

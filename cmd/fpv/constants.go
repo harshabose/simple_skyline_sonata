@@ -1,4 +1,4 @@
-package delivery
+package fpv
 
 const (
 	DefaultVideoClockRate uint32 = 90000

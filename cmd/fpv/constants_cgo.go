@@ -1,6 +1,6 @@
 //go:build cgo_enabled
 
-package delivery
+package fpv
 
 import "github.com/asticode/go-astiav"
 
