@@ -79,12 +79,12 @@ func main() {
 			drone, err := client.CreateClient(
 				ctx, cancel, mediaEngine, registry, settings,
 				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
-				client.WithBandwidthControlInterceptor(fpv.InitialBitrate, fpv.MinimumBitrate, fpv.MaximumBitrate, time.Second),
-				client.WithTWCCHeaderExtensionSender(),
+				// client.WithBandwidthControlInterceptor(fpv.InitialBitrate, fpv.MinimumBitrate, fpv.MaximumBitrate, time.Second),
+				// client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 				client.WithSimulcastExtensionHeaders(),
-				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 			)
 			if err != nil {
 				panic(err)
@@ -124,7 +124,7 @@ func main() {
 			// 	panic(err)
 			// }
 
-			if err := pc.Connect("DELIVERY"); err != nil {
+			if err := pc.Connect("FPV"); err != nil {
 				panic(err)
 			}
 

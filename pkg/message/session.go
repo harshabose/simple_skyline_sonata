@@ -17,7 +17,7 @@ import (
 type Session struct {
 	config         config.Config
 	Conn           *websocket.Conn
-	PeerConnection *client.client
+	PeerConnection *client.Client
 	mux            sync.RWMutex
 }
 
@@ -34,10 +34,10 @@ func (s *Session) Write(ctx context.Context, msg Message) error {
 	return nil
 }
 
-func NewSessionWithIdent(ident *Ident, conn *websocket.Conn, pc *client.PeerConnection) *Session {
+func NewSessionWithIdent(ident *Ident, conn *websocket.Conn, client *client.Client) *Session {
 	return &Session{
 		config:         ident.Config,
 		Conn:           conn,
-		PeerConnection: pc,
+		PeerConnection: client,
 	}
 }

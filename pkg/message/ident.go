@@ -31,10 +31,6 @@ func (m *Ident) Process(session *Session) error {
 	session.mux.Lock()
 	defer session.mux.Unlock()
 
-	if err := m.signValidate(); err != nil {
-		return err
-	}
-
 	session.config = m.Config
 	// CHECK CONFIG
 
