@@ -7,9 +7,9 @@
 [submodule "dependencies/mediapipe"]
 	path = dependencies/mediapipe
 	url = https://github.com/harshabose/mediapipe.git
-[submodule "dependencies/tools/multierr"]
-	path = dependencies/tools/multierr
-	url = https://github.com/harshabose/multierr.git
+[submodule "dependencies/tools"]
+	path = dependencies/tools
+	url = https://github.com/harshabose/tools.git
 [submodule "dependencies/services"]
 	path = dependencies/services
 	url = https://github.com/harshabose/services.git
