@@ -8,8 +8,6 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 
-	"github.com/harshabose/services/pkg/rtsp"
-
 	"github.com/harshabose/mediapipe"
 	"github.com/harshabose/mediapipe/pkg/consumers"
 	"github.com/harshabose/mediapipe/pkg/duplexers"
@@ -64,7 +62,7 @@ func main() {
 				panic(err)
 			}
 
-			if _, err := pc.CreateMediaSink("A8-MINI", mediasink.RTSPSink(&rtsp.ClientConfig{
+			if _, err := pc.CreateMediaSink("A8-MINI", mediasink.RTSPSink(&duplexers.RTSPClientConfig{
 				ServerAddr:        "localhost",
 				ServerPort:        8554,
 				StreamPath:        "DELIVERY/A8-MINI",
@@ -78,7 +76,7 @@ func main() {
 				panic(err)
 			}
 
-			if err := pc.Connect("DELIVERY"); err != nil {
+			if err := pc.Connect("FPV"); err != nil {
 				panic(err)
 			}
 
