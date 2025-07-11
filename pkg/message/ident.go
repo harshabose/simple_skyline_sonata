@@ -1,7 +1,5 @@
 package message
 
-// WARN: DO NOT COMPILE THIS FILE. THIS IS FOR FUTURE
-
 import (
 	"github.com/harshabose/simple_webrtc_comm/pkg/config"
 )
@@ -18,12 +16,6 @@ func (m *Ident) GetProtocol() Protocol {
 }
 
 func (m *Ident) Validate() error {
-	return nil
-}
-
-func (m *Ident) signValidate() error {
-	// serverSignatire := os.Getenv("SERVER_SIGNATURE")
-
 	return nil
 }
 
