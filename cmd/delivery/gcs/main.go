@@ -33,7 +33,7 @@ func main() {
 			registry := &interceptor.Registry{}
 			settings := &webrtc.SettingEngine{}
 
-			gcs, err := client.CreateClient(
+			gcs, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
 				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
 				client.WithTWCCHeaderExtensionSender(),
@@ -62,7 +62,7 @@ func main() {
 				panic(err)
 			}
 
-			if _, err := pc.CreateMediaSink("A8-MINI", mediasink.RTSPSink(&duplexers.RTSPClientConfig{
+			if _, err := pc.CreateMediaSink("A8-MINI", mediasink.RTSPSink(&consumers.RTSPClientConfig{
 				ServerAddr:        "localhost",
 				ServerPort:        8554,
 				StreamPath:        "DELIVERY/A8-MINI",

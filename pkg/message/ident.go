@@ -8,7 +8,7 @@ const IdentProtocol Protocol = "ident"
 
 type Ident struct {
 	BaseMessage
-	Config config.Config `json:"config"`
+	Config *config.Config `json:"config"`
 }
 
 func (m *Ident) GetProtocol() Protocol {

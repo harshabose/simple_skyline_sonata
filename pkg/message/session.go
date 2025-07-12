@@ -15,10 +15,13 @@ import (
 )
 
 type Session struct {
-	config         config.Config
-	Conn           *websocket.Conn
-	PeerConnection *client.Client
-	mux            sync.RWMutex
+	config *config.Config
+	Conn   *websocket.Conn
+	Client *client.Client
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	mux    sync.RWMutex
 }
 
 func (s *Session) Write(ctx context.Context, msg Message) error {
@@ -34,10 +37,13 @@ func (s *Session) Write(ctx context.Context, msg Message) error {
 	return nil
 }
 
-func NewSessionWithIdent(ident *Ident, conn *websocket.Conn, client *client.Client) *Session {
+func NewSessionWithIdent(ctx context.Context, ident *Ident, conn *websocket.Conn, client *client.Client) *Session {
+	ctx2, cancel2 := context.WithCancel(ctx)
 	return &Session{
-		config:         ident.Config,
-		Conn:           conn,
-		PeerConnection: client,
+		config: ident.Config,
+		Conn:   conn,
+		Client: client,
+		ctx:    ctx2,
+		cancel: cancel2,
 	}
 }

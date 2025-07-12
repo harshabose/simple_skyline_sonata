@@ -61,12 +61,6 @@ func main() {
 					transcode.WithCodecSettings(transcode.LowLatencyBitrateControlled),
 					transcode.WithEncoderBufferSize(int(fpv.DefaultVideoFPS), pPool),
 				),
-				// transcode.WithMultiEncoderBitrateControl(ctx,
-				// 	astiav.CodecIDH264,
-				// 	transcode.NewMultiConfig(fpv.MinimumBitrate, fpv.MaximumBitrate, 10),
-				// 	transcode.LowLatencyBitrateControlled,
-				// 	int(fpv.DefaultVideoFPS), buffer.CreatePacketPool(),
-				// ),
 			)
 			if err != nil {
 				panic(err)
@@ -76,15 +70,12 @@ func main() {
 			registry := &interceptor.Registry{}
 			settings := &webrtc.SettingEngine{}
 
-			drone, err := client.CreateClient(
+			drone, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
-				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
-				// client.WithBandwidthControlInterceptor(fpv.InitialBitrate, fpv.MinimumBitrate, fpv.MaximumBitrate, time.Second),
-				// client.WithTWCCHeaderExtensionSender(),
+				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 				client.WithSimulcastExtensionHeaders(),
-				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 			)
 			if err != nil {
 				panic(err)
@@ -96,7 +87,6 @@ func main() {
 				client.WithFirebaseOfferSignal,
 				client.WithMediaSources(),
 				client.WithDataChannels(),
-				// client.WithBandwidthControl(),
 			)
 			if err != nil {
 				panic(err)
@@ -115,20 +105,11 @@ func main() {
 				panic(err)
 			}
 
-			// bwe, err := pc.GetBWEstimator()
-			// if err != nil {
-			// 	panic(err)
-			// }
-			//
-			// if err := bwe.Subscribe("A8-MINI", track.GetPriority(), transcoder.OnUpdateBitrate()); err != nil {
-			// 	panic(err)
-			// }
-
 			if err := pc.Connect("FPV"); err != nil {
 				panic(err)
 			}
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 
 			rl := mediapipe.NewIdentityAnyReader[[]byte](l)
 			wl := mediapipe.NewIdentityAnyWriter[[]byte](l)
@@ -145,7 +126,7 @@ func main() {
 			rd := mediapipe.NewIdentityAnyReader[[]byte](ird)
 			wd := mediapipe.NewIdentityAnyWriter[[]byte](iwd)
 
-			w := mediapipe.NewAnyWriter[media.Sample, *astiav.Packet](track, nil)
+			w := mediapipe.NewAnyWriter[media.Sample, *astiav.Packet](consumers.NewPionSampleConsumer(track), nil)
 			r := mediapipe.NewAnyReader[media.Sample, *astiav.Packet](transcoder, func(packet *astiav.Packet) (media.Sample, error) {
 				s := media.Sample{
 					Data:               make([]byte, packet.Size()),
@@ -166,7 +147,6 @@ func main() {
 			mediapipe.NewAnyPipe(ctx, rl, wd).Start()
 			mediapipe.NewAnyPipe(ctx, rd, wl).Start()
 			mediapipe.NewAnyPipe(ctx, r, w).Start()
-			// bwe.Start()
 
 			drone.WaitUntilClosed()
 		}()

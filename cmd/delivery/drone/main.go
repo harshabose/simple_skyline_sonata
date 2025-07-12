@@ -76,7 +76,7 @@ func main() {
 			registry := &interceptor.Registry{}
 			settings := &webrtc.SettingEngine{}
 
-			drone, err := client.CreateClient(
+			drone, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
 				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
 				// client.WithBandwidthControlInterceptor(fpv.InitialBitrate, fpv.MinimumBitrate, fpv.MaximumBitrate, time.Second),

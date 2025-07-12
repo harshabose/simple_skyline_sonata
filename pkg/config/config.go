@@ -1,10 +1,14 @@
 package config
 
 import (
+	"context"
 	"time"
-)
 
-// WARN: DO NOT COMPILE THIS FILE. THIS IS FOR FUTURE
+	"github.com/pion/interceptor"
+	"github.com/pion/webrtc/v4"
+
+	"github.com/harshabose/simple_webrtc_comm/client"
+)
 
 type DataChannelConfig struct {
 	Label             string `json:"label" yaml:"label"`
@@ -16,8 +20,8 @@ type DataChannelConfig struct {
 }
 
 type MediaConfig struct {
-	Audio []AudioConfig `json:"audio" yaml:"audio"`
-	Video []VideoConfig `json:"video" yaml:"video"`
+	Audio []AudioConfig `json:"audio,omitempty" yaml:"audio,omitempty"`
+	Video []VideoConfig `json:"video,omitempty" yaml:"video,omitempty"`
 }
 
 type AudioConfig struct {
@@ -54,14 +58,46 @@ type LoggingConfig struct {
 }
 
 type Config struct {
-	DataChannels []DataChannelConfig `json:"data_channels" yaml:"data_channels"`
-	Media        MediaConfig         `json:"media" yaml:"media"`
+	ClientConfig          client.ClientConfig           `json:"client_config" yaml:"client_config"`
+	PeerConnectionConfigs []client.PeerConnectionConfig `json:"peer_connection_configs" yaml:"peer_connection_configs"`
 
-	// Security configuration
+	MediaEngine         webrtc.MediaEngine   `json:"-"`
+	InterceptorRegistry interceptor.Registry `json:"-"`
+	SettingsEngine      webrtc.SettingEngine `json:"-"`
+
 	// Security SecurityConfig `json:"security" yaml:"security"`
 
 	Logging LoggingConfig `json:"logging" yaml:"logging"`
 
 	UserID string `json:"user_id,omitempty" yaml:"user_id,omitempty"`
 	RoomID string `json:"room_id,omitempty" yaml:"room_id,omitempty"`
+}
+
+func (c *Config) GenerateClient(ctx context.Context, cancel context.CancelFunc) (*client.Client, error) {
+	return client.NewClientFromConfig(ctx, cancel, &c.MediaEngine, &c.InterceptorRegistry, &c.SettingsEngine, &c.ClientConfig)
+}
+
+func (c *Config) GeneratePeerConnection(client *client.Client, pcc client.PeerConnectionConfig) (*client.PeerConnection, error) {
+	pc, err := client.CreatePeerConnection(pcc.Name, pcc.RTCConfig, pcc.ToOptions()...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pcc.CreateDataChannels(pc); err != nil {
+		// TODO: REMOVE PEER CONNECTION
+		return nil, err
+	}
+
+	if err := pcc.CreateMediaSources(pc); err != nil {
+		// TODO: REMOVE PEER CONNECTION
+		return nil, err
+	}
+
+	if err := pcc.CreateMediaSinks(pc); err != nil {
+		// TODO: REMOVE PEER CONNECTION
+		return nil, err
+	}
+
+	return pc, nil
+
 }
