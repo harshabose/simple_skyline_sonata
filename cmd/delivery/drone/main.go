@@ -16,12 +16,13 @@ import (
 	"github.com/harshabose/mediapipe/pkg/consumers"
 	"github.com/harshabose/mediapipe/pkg/duplexers"
 	"github.com/harshabose/mediapipe/pkg/generators"
+	"github.com/harshabose/simple_webrtc_comm/cmd/fpv"
 	"github.com/harshabose/tools/pkg/buffer"
 
 	"github.com/harshabose/simple_webrtc_comm/client"
 	"github.com/harshabose/simple_webrtc_comm/client/pkg/mediasource"
 	"github.com/harshabose/simple_webrtc_comm/client/pkg/transcode"
-	"github.com/harshabose/simple_webrtc_comm/cmd/fpv"
+	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 )
 
 func main() {
@@ -43,30 +44,24 @@ func main() {
 				transcode.WithGeneralDemuxer(ctx,
 					"0",
 					transcode.WithAvFoundationInputFormatOption,
-					transcode.WithDemuxerBuffer(int(fpv.DefaultVideoFPS), pPool),
+					transcode.WithDemuxerBuffer(int(delivery.DefaultVideoFPS), pPool),
 				),
 				transcode.WithGeneralDecoder(ctx,
-					transcode.WithDecoderBuffer(int(fpv.DefaultVideoFPS), fPool),
+					transcode.WithDecoderBuffer(int(delivery.DefaultVideoFPS), fPool),
 				),
 				transcode.WithGeneralFilter(ctx,
 					transcode.VideoFilters,
-					transcode.WithFilterBuffer(int(fpv.DefaultVideoFPS), fPool),
-					transcode.WithVideoScaleFilterContent(fpv.DefaultVideoWidth, fpv.DefaultVideoHeight),
-					transcode.WithVideoPixelFormatFilterContent(fpv.DefaultPixelFormat),
-					transcode.WithVideoFPSFilterContent(fpv.DefaultVideoFPS),
+					transcode.WithFilterBuffer(int(delivery.DefaultVideoFPS), fPool),
+					transcode.WithVideoScaleFilterContent(delivery.DefaultVideoWidth, delivery.DefaultVideoHeight),
+					transcode.WithVideoPixelFormatFilterContent(delivery.DefaultPixelFormat),
+					transcode.WithVideoFPSFilterContent(delivery.DefaultVideoFPS),
 				),
-				transcode.WithGeneralEncoder(
-					ctx,
+				transcode.WithMultiEncoderBitrateControl(ctx,
 					astiav.CodecIDH264,
-					transcode.WithCodecSettings(transcode.LowLatencyBitrateControlled),
-					transcode.WithEncoderBufferSize(int(fpv.DefaultVideoFPS), pPool),
+					transcode.NewMultiConfig(delivery.MinimumBitrate, delivery.MaximumBitrate, 10),
+					transcode.LowLatencyBitrateControlled,
+					int(fpv.DefaultVideoFPS), buffer.CreatePacketPool(),
 				),
-				// transcode.WithMultiEncoderBitrateControl(ctx,
-				// 	astiav.CodecIDH264,
-				// 	transcode.NewMultiConfig(fpv.MinimumBitrate, fpv.MaximumBitrate, 10),
-				// 	transcode.LowLatencyBitrateControlled,
-				// 	int(fpv.DefaultVideoFPS), buffer.CreatePacketPool(),
-				// ),
 			)
 			if err != nil {
 				panic(err)
@@ -78,25 +73,25 @@ func main() {
 
 			drone, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
-				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
-				// client.WithBandwidthControlInterceptor(fpv.InitialBitrate, fpv.MinimumBitrate, fpv.MaximumBitrate, time.Second),
-				// client.WithTWCCHeaderExtensionSender(),
+				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
+				client.WithBandwidthControlInterceptor(delivery.InitialBitrate, delivery.MinimumBitrate, delivery.MaximumBitrate, time.Second),
+				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 				client.WithSimulcastExtensionHeaders(),
-				// client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
+				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 			)
 			if err != nil {
 				panic(err)
 			}
 
-			pc, err := drone.CreatePeerConnection(
+			pc, err := drone.CreatePeerConnectionWithBWEstimator(
 				"MAIN",
 				client.GetRTCConfiguration(),
 				client.WithFirebaseOfferSignal,
 				client.WithMediaSources(),
 				client.WithDataChannels(),
-				// client.WithBandwidthControl(),
+				client.WithBandwidthControl(),
 			)
 			if err != nil {
 				panic(err)
@@ -108,27 +103,27 @@ func main() {
 			}
 
 			track, err := pc.CreateMediaSource("A8-MINI",
-				mediasource.WithH264Track(fpv.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31),
+				mediasource.WithH264Track(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31),
 				mediasource.WithPriority(mediasource.Level5),
 			)
 			if err != nil {
 				panic(err)
 			}
 
-			// bwe, err := pc.GetBWEstimator()
-			// if err != nil {
-			// 	panic(err)
-			// }
-			//
-			// if err := bwe.Subscribe("A8-MINI", track.GetPriority(), transcoder.OnUpdateBitrate()); err != nil {
-			// 	panic(err)
-			// }
-
-			if err := pc.Connect("FPV"); err != nil {
+			bwe, err := pc.GetBWEstimator()
+			if err != nil {
 				panic(err)
 			}
 
-			time.Sleep(5 * time.Second)
+			if err := bwe.Subscribe("A8-MINI", track.GetPriority(), transcoder.OnUpdateBitrate()); err != nil {
+				panic(err)
+			}
+
+			if err := pc.Connect("DELIVERY"); err != nil {
+				panic(err)
+			}
+
+			time.Sleep(10 * time.Second)
 
 			rl := mediapipe.NewIdentityAnyReader[[]byte](l)
 			wl := mediapipe.NewIdentityAnyWriter[[]byte](l)
@@ -145,12 +140,12 @@ func main() {
 			rd := mediapipe.NewIdentityAnyReader[[]byte](ird)
 			wd := mediapipe.NewIdentityAnyWriter[[]byte](iwd)
 
-			w := mediapipe.NewAnyWriter[media.Sample, *astiav.Packet](track, nil)
+			w := mediapipe.NewAnyWriter[media.Sample, *astiav.Packet](consumers.NewPionSampleConsumer(track), nil)
 			r := mediapipe.NewAnyReader[media.Sample, *astiav.Packet](transcoder, func(packet *astiav.Packet) (media.Sample, error) {
 				s := media.Sample{
 					Data:               make([]byte, packet.Size()),
 					Timestamp:          time.Now(),
-					Duration:           time.Second / time.Duration(fpv.DefaultVideoFPS),
+					Duration:           time.Second / time.Duration(delivery.DefaultVideoFPS),
 					PacketTimestamp:    uint32(packet.Pts()),
 					PrevDroppedPackets: 0,
 					Metadata:           nil,
@@ -166,7 +161,7 @@ func main() {
 			mediapipe.NewAnyPipe(ctx, rl, wd).Start()
 			mediapipe.NewAnyPipe(ctx, rd, wl).Start()
 			mediapipe.NewAnyPipe(ctx, r, w).Start()
-			// bwe.Start()
+			bwe.Start()
 
 			drone.WaitUntilClosed()
 		}()

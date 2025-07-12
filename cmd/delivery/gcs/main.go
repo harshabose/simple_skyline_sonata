@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 
 	"github.com/harshabose/mediapipe"
@@ -14,7 +15,8 @@ import (
 	"github.com/harshabose/mediapipe/pkg/generators"
 	"github.com/harshabose/simple_webrtc_comm/client"
 	"github.com/harshabose/simple_webrtc_comm/client/pkg/mediasink"
-	"github.com/harshabose/simple_webrtc_comm/cmd/fpv"
+	"github.com/harshabose/simple_webrtc_comm/client/pkg/mediasource"
+	"github.com/harshabose/simple_webrtc_comm/cmd/delivery"
 )
 
 func main() {
@@ -29,13 +31,34 @@ func main() {
 				panic(err)
 			}
 
+			rtspClient, err := consumers.NewRTSPClient(
+				ctx,
+				&consumers.RTSPClientConfig{
+					ServerAddr:        "localhost",
+					ServerPort:        8554,
+					StreamPath:        "fpv/main/a8-mini",
+					ReadTimeout:       10 * time.Second,
+					WriteTimeout:      10 * time.Second,
+					DialTimeout:       10 * time.Second,
+					ReconnectAttempts: 10,
+					ReconnectDelay:    2 * time.Second,
+					UserAgent:         "GoRTSP-FPV/main",
+				},
+				nil,
+				consumers.WithH264Options(consumers.PacketisationMode1, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
+			)
+			if err != nil {
+				panic(err)
+			}
+			rtspClient.Start()
+
 			mediaEngine := &webrtc.MediaEngine{}
 			registry := &interceptor.Registry{}
 			settings := &webrtc.SettingEngine{}
 
 			gcs, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
-				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, client.PacketisationMode1, client.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
+				client.WithH264MediaEngine(delivery.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31, delivery.DefaultSPSBase64, delivery.DefaultPPSBase64),
 				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
@@ -62,17 +85,8 @@ func main() {
 				panic(err)
 			}
 
-			if _, err := pc.CreateMediaSink("A8-MINI", mediasink.RTSPSink(&consumers.RTSPClientConfig{
-				ServerAddr:        "localhost",
-				ServerPort:        8554,
-				StreamPath:        "DELIVERY/A8-MINI",
-				ReadTimeout:       10 * time.Second,
-				WriteTimeout:      10 * time.Second,
-				DialTimeout:       10 * time.Second,
-				ReconnectAttempts: 10,
-				ReconnectDelay:    2 * time.Second,
-				UserAgent:         "GoRTSP-Host/1.0",
-			})); err != nil {
+			sink, err := pc.CreateMediaSink("A8-MINI", mediasink.WithH264Track(delivery.DefaultVideoClockRate))
+			if err != nil {
 				panic(err)
 			}
 
@@ -97,8 +111,12 @@ func main() {
 			rd := mediapipe.NewIdentityAnyReader[[]byte](ird)
 			wd := mediapipe.NewIdentityAnyWriter[[]byte](iwd)
 
+			r := mediapipe.NewIdentityAnyReader[*rtp.Packet](generators.NewPionRTPGenerator(sink))
+			w := mediapipe.NewIdentityAnyWriter[*rtp.Packet](rtspClient)
+
 			mediapipe.NewAnyPipe(ctx, rl, wd).Start()
 			mediapipe.NewAnyPipe(ctx, rd, wl).Start()
+			mediapipe.NewAnyPipe(ctx, r, w).Start()
 
 			gcs.WaitUntilClosed()
 		}()

@@ -59,11 +59,9 @@ func main() {
 			gcs, err := client.NewClient(
 				ctx, cancel, mediaEngine, registry, settings,
 				client.WithH264MediaEngine(fpv.DefaultVideoClockRate, mediasource.PacketisationMode1, mediasource.ProfileLevelBaseline31, fpv.DefaultSPSBase64, fpv.DefaultPPSBase64),
-				client.WithTWCCHeaderExtensionSender(),
 				client.WithNACKInterceptor(client.NACKGeneratorLowLatency, client.NACKResponderLowLatency),
 				client.WithRTCPReportsInterceptor(client.RTCPReportIntervalLowLatency),
 				client.WithSimulcastExtensionHeaders(),
-				client.WithTWCCSenderInterceptor(client.TWCCIntervalLowLatency),
 			)
 			if err != nil {
 				panic(err)
