@@ -405,3 +405,16 @@ run-fpv-gcs:
 	echo "Running fpv gcs without CGO..."
 	cd $(BUILD_DIR)/fpv/gcs && \
 	$(RUNTIME_ENV) ./skyline_sonata.fpv.gcs
+
+build-simple-rtsp-server:
+	echo "Building simple rtsp server"
+	rm -rf $(BUILD_DIR)/rtsp/server
+	mkdir -p $(BUILD_DIR)/rtsp/server
+	cd $(WORKING_DIR)/dependencies/services/cmd/rtsp && \
+	go build -o $(BUILD_DIR)/rtsp/server/simple-rtsp-server . || (echo "Build failed"; exit 1)
+	echo "simple rtsp server binary built successfully at $(BUILD_DIR)/rtsp/server"
+
+run-simple-rtsp-server:
+	echo "Running simple-rtsp-server ..."
+	cd $(BUILD_DIR)/rtsp/server && \
+	./simple-rtsp-server
